@@ -239,4 +239,5 @@ const TranslatorPage = () => {
   );
 };
 
+// Assign component to variable and then export
 export default TranslatorPage;

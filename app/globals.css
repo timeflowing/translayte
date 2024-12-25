@@ -19,3 +19,96 @@ body {
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+
+.translator-container {
+  max-width: 800px;
+  margin: 40px auto;
+  padding: 20px;
+  font-family: "Inter", sans-serif;
+  background-color: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+}
+
+.translator-title {
+  text-align: center;
+  font-size: 28px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.input-section {
+  margin-bottom: 20px;
+}
+
+.input-field,
+.textarea-field {
+  width: 100%;
+  padding: 10px;
+  font-size: 16px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  margin-bottom: 10px;
+}
+
+.languages-section h3 {
+  font-size: 18px;
+  margin-bottom: 10px;
+}
+
+.languages-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.language-checkbox {
+  font-size: 16px;
+}
+
+.translate-button,
+.copy-json-button {
+  width: 100%;
+  padding: 12px;
+  font-size: 16px;
+  font-weight: bold;
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.translate-button[disabled] {
+  background-color: #999;
+  cursor: not-allowed;
+}
+
+.translations-section {
+  margin-top: 30px;
+  padding: 20px;
+  background-color: #f9f9f9;
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+}
+
+.translation-item {
+  margin-bottom: 10px;
+}
+
+.translation-language {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.translation-text {
+  background-color: #fff;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  font-size: 14px;
+  white-space: pre-wrap;
+}
