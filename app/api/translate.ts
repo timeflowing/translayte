@@ -8,7 +8,7 @@ const translateText = async (
   try {
     const response: AxiosResponse<any, any> = await axios.post(
       `${
-        process.env.NEXT_PUBLIC_TRANSLATOR_ENDPOINT
+        process.env.TRANSLATOR_ENDPOINT
       }/translate?api-version=3.0&to=${toLanguage}${
         fromLanguage ? `&from=${fromLanguage}` : ""
       }`,
@@ -19,10 +19,8 @@ const translateText = async (
       ],
       {
         headers: {
-          "Ocp-Apim-Subscription-Key":
-            process.env.NEXT_PUBLIC_TRANSLATOR_SUBSCRIPTION_KEY!,
-          "Ocp-Apim-Subscription-Region":
-            process.env.NEXT_PUBLIC_TRANSLATOR_REGION!,
+          "Ocp-Apim-Subscription-Key": process.env.TRANSLATOR_SUBSCRIPTION_KEY!,
+          "Ocp-Apim-Subscription-Region": process.env.TRANSLATOR_REGION!,
           "Content-Type": "application/json",
         },
       }
