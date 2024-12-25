@@ -1,12 +1,21 @@
 import axios, { AxiosResponse } from "axios";
 
+type Translation = {
+  text: string;
+  to: string;
+};
+
+type AzureTranslationResponse = {
+  translations: Translation[];
+}[];
+
 const translateText = async (
   text: string,
   toLanguage: string,
   fromLanguage: string = ""
 ): Promise<string> => {
   try {
-    const response: AxiosResponse<any, any> = await axios.post(
+    const response: AxiosResponse<AzureTranslationResponse> = await axios.post(
       `${
         process.env.TRANSLATOR_ENDPOINT
       }/translate?api-version=3.0&to=${toLanguage}${
@@ -41,5 +50,4 @@ const translateText = async (
   }
 };
 
-// Assigning the function to a variable and then exporting it
 export default translateText;
