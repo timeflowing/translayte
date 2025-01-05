@@ -43,13 +43,19 @@ const TranslatorPage = () => {
   };
 
   const handleTranslate = async () => {
-    const results: { language: string; translation: string }[] = [];
-    for (const lang of selectedLanguages) {
-      const translation = await translateText(text, lang);
-      const languageName = languages.find((l) => l.code === lang)?.name || lang;
-      results.push({ language: languageName, translation });
+    try {
+      const results = await Promise.all(
+        selectedLanguages.map(async (lang) => {
+          const translation = await translateText(text, lang);
+          const languageName =
+            languages.find((l) => l.code === lang)?.name || lang;
+          return { language: languageName, translation };
+        })
+      );
+      setTranslations(results);
+    } catch (error) {
+      console.error("Error during translation:", error);
     }
-    setTranslations(results);
   };
 
   const handleCopyJSON = () => {
