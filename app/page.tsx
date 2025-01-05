@@ -33,7 +33,7 @@ const TranslatorPage = () => {
   const [translations, setTranslations] = useState<
     { language: string; translation: string }[]
   >([]);
-
+  const [copiedMessage, setCopiedMessage] = useState("");
   const handleCheckboxChange = (languageCode: string) => {
     setSelectedLanguages((prev) =>
       prev.includes(languageCode)
@@ -57,13 +57,18 @@ const TranslatorPage = () => {
       console.error("Error during translation:", error);
     }
   };
-
-  const handleCopyJSON = () => {
-    const jsonOutput = translations
-      .map((t) => `"${keyValue}": "${t.translation}"`)
-      .join(",\n");
-    navigator.clipboard.writeText(`{\n${jsonOutput}\n}`);
-    alert("Copied JSON to clipboard!");
+  const handleCopyJSONForTranslation = (
+    translation: string,
+    setCopiedMessage: (message: string) => void
+  ) => {
+    const jsonSnippet = `"${keyValue}": "${translation}",`;
+    navigator.clipboard
+      .writeText(jsonSnippet)
+      .then(() => {
+        setCopiedMessage("Copied to clipboard!");
+        setTimeout(() => setCopiedMessage(""), 2000); // Clears the message after 2 seconds
+      })
+      .catch((err) => console.error("Failed to copy JSON snippet:", err));
   };
 
   return (
@@ -89,6 +94,17 @@ const TranslatorPage = () => {
       >
         Translator Tool
       </h1>
+      {copiedMessage && (
+        <span
+          style={{
+            fontSize: "12px",
+            color: "green",
+            marginLeft: "10px",
+          }}
+        >
+          {copiedMessage}
+        </span>
+      )}
       <div style={{ marginBottom: "20px" }}>
         <input
           type="text"
@@ -194,19 +210,48 @@ const TranslatorPage = () => {
           >
             Translations:
           </h3>
-          <div style={{ marginBottom: "10px" }}>
+          <div style={{ marginBottom: "15px" }}>
             {translations.map((t, index) => (
               <div key={index} style={{ marginBottom: "10px" }}>
-                <p
+                <div
                   style={{
-                    fontSize: "16px",
-                    fontWeight: "bold",
-                    marginBottom: "5px",
-                    color: "#333",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginTop: 30,
                   }}
                 >
-                  {t.language}:
-                </p>
+                  <p
+                    style={{
+                      fontSize: "16px",
+                      fontWeight: "bold",
+                      color: "#333",
+                    }}
+                  >
+                    {t.language}:
+                  </p>
+                  <button
+                    onClick={() =>
+                      handleCopyJSONForTranslation(
+                        t.translation,
+                        setCopiedMessage
+                      )
+                    }
+                    style={{
+                      padding: "5px 10px",
+                      fontSize: "14px",
+                      backgroundColor: "#007bff",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "8px",
+                      cursor: "pointer",
+                      marginBottom: 10,
+                    }}
+                  >
+                    Copy JSON
+                  </button>
+                </div>
+
                 <pre
                   style={{
                     backgroundColor: "#fff",
@@ -218,32 +263,15 @@ const TranslatorPage = () => {
                     color: "black",
                   }}
                 >
-                  {`"${keyValue}": "${t.translation}"`}
+                  {`"${keyValue}": "${t.translation}",`}
                 </pre>
               </div>
             ))}
           </div>
-          <button
-            onClick={handleCopyJSON}
-            style={{
-              marginTop: "10px",
-              padding: "10px 20px",
-              fontSize: "14px",
-              fontWeight: "bold",
-              backgroundColor: "#007bff",
-              color: "white",
-              border: "none",
-              borderRadius: "8px",
-              cursor: "pointer",
-            }}
-          >
-            Copy JSON
-          </button>
         </div>
       )}
     </div>
   );
 };
 
-// Assign component to variable and then export
 export default TranslatorPage;
