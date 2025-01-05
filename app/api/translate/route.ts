@@ -49,7 +49,11 @@ export async function POST(req: Request) {
 
     throw new Error("Unexpected response structure");
   } catch (error) {
-    console.error("Translation API error:", error.message);
+    if (error instanceof Error) {
+      console.error("Translation API error:", error.message);
+    } else {
+      console.error("Unknown error occurred during translation:", error);
+    }
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }
