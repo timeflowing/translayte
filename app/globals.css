@@ -10,23 +10,23 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
-    --foreground: #ededed;
+    --foreground: ##0a0a0a;
   }
 }
 
 body {
-  color: var(--background);
+  color: var(--foreground); /* Ensure text color matches the foreground */
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
 }
-
 
 .translator-container {
   max-width: 800px;
   margin: 40px auto;
   padding: 20px;
   font-family: "Inter", sans-serif;
-  background-color: #ffffff;
+  background-color: var(--background); /* Dynamic background */
+  color: var(--foreground); /* Dynamic text color */
   border-radius: 12px;
   border: 1px solid #e0e0e0;
 }
@@ -35,7 +35,7 @@ body {
   text-align: center;
   font-size: 28px;
   font-weight: 600;
-  color: #333;
+  color: var(--foreground); /* Dynamic text color */
   margin-bottom: 20px;
 }
 
@@ -51,11 +51,14 @@ body {
   border-radius: 8px;
   border: 1px solid #ccc;
   margin-bottom: 10px;
+  color: var(--foreground); /* Ensure input text is visible */
+  background-color: var(--background); /* Match theme */
 }
 
 .languages-section h3 {
   font-size: 18px;
   margin-bottom: 10px;
+  color: var(--foreground); /* Ensure visible in both modes */
 }
 
 .languages-grid {
@@ -65,7 +68,8 @@ body {
 }
 
 .language-checkbox {
-  font-size: 16px;
+  font-size: 26px;
+  color: var(--foreground); /* Ensure text color matches theme */
 }
 
 .translate-button,
@@ -89,7 +93,8 @@ body {
 .translations-section {
   margin-top: 30px;
   padding: 20px;
-  background-color: #f9f9f9;
+  background-color: var(--background); /* Dynamic background */
+  color: var(--foreground); /* Dynamic text color */
   border-radius: 12px;
   border: 1px solid #e0e0e0;
 }
@@ -102,10 +107,12 @@ body {
   font-size: 16px;
   font-weight: bold;
   margin-bottom: 5px;
+  color: var(--foreground); /* Ensure text color matches theme */
 }
 
 .translation-text {
-  background-color: #fff;
+  background-color: var(--background); /* Dynamic background */
+  color: var(--foreground); /* Ensure text is visible */
   padding: 10px;
   border-radius: 8px;
   border: 1px solid #ddd;

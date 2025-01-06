@@ -4,32 +4,36 @@ import React, { useState } from "react";
 import { translateText } from "./utils/translator";
 
 const languages = [
-  { code: "ar", name: "Arabic" },
-  { code: "bn", name: "Bengali" },
-  { code: "zh", name: "Chinese (Simplified)" },
-  { code: "cs", name: "Czech" },
-  { code: "nl", name: "Dutch" },
   { code: "en", name: "English" },
+  { code: "cs", name: "Czech" },
+  { code: "it", name: "Italian" },
+  { code: "bn", name: "Bengali" },
+  { code: "nl", name: "Dutch" },
   { code: "fr", name: "French" },
   { code: "de", name: "German" },
   { code: "hi", name: "Hindi" },
-  { code: "it", name: "Italian" },
   { code: "ja", name: "Japanese" },
   { code: "ko", name: "Korean" },
   { code: "ms", name: "Malay" },
   { code: "fa", name: "Persian" },
   { code: "pl", name: "Polish" },
   { code: "pt", name: "Portuguese" },
-  { code: "ru", name: "Russian" },
   { code: "es", name: "Spanish" },
+  { code: "zh", name: "Chinese" },
+  { code: "ru", name: "Russian" },
   { code: "tr", name: "Turkish" },
+  { code: "ar", name: "Arabic" },
   { code: "vi", name: "Vietnamese" },
 ];
 
 const TranslatorPage = () => {
   const [text, setText] = useState("");
   const [keyValue, setKeyValue] = useState("");
-  const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
+  const [selectedLanguages, setSelectedLanguages] = useState<string[]>([
+    "en",
+    "cs",
+    "it",
+  ]);
   const [translations, setTranslations] = useState<
     { language: string; translation: string }[]
   >([]);
