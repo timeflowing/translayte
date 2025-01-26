@@ -51,19 +51,3 @@ export const translateIntoMultipleLanguages = async (
     throw error;
   }
 };
-
-// Example usage
-(async () => {
-  const text = "Hello, how are you?";
-  const targetLanguages = ["ar", "fr", "es", "hi"]; // Arabic, French, Spanish, Hindi
-
-  try {
-    const translations = await translateIntoMultipleLanguages(
-      text,
-      targetLanguages
-    );
-    console.log("Translations:", translations);
-  } catch (error) {
-    console.error("Translation error:", error);
-  }
-})();

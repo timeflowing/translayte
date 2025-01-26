@@ -1,91 +1,62 @@
-// pages/api/translate.js
+import axios from "axios";
 
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).send({ message: "Only POST requests allowed" });
-  }
+const API_URL = "/api/translate";
 
-  const { text, languages } = req.body;
+export const translateText = async (
+  text: string,
+  toLanguage: string,
+  fromLanguage: string = ""
+): Promise<string> => {
+  try {
+    const response = await axios.post(API_URL, {
+      text,
+      toLanguage,
+      fromLanguage,
+    });
 
-  // Validate input
-  if (
-    !text ||
-    typeof text !== "string" ||
-    !Array.isArray(languages) ||
-    languages.length === 0
-  ) {
-    return res.status(400).json({ message: "Invalid input data" });
-  }
+    if (response.data && response.data.translation) {
+      const translation = response.data.translation;
 
-  // Retrieve Azure Translator credentials from environment variables
-  const apiKey = process.env.AZURE_TRANSLATOR_KEY;
-  const endpoint = process.env.AZURE_TRANSLATOR_ENDPOINT;
-  const region = process.env.AZURE_TRANSLATOR_REGION; // may be required depending on your endpoint
-  if (!apiKey || !endpoint) {
-    return res.status(500).json({ message: "Server configuration error." });
-  }
-
-  const translations = {};
-
-  // For each language, call Azure Translator
-  // API docs: https://learn.microsoft.com/azure/cognitive-services/translator/reference/v3-0-translate
-  for (const lang of languages) {
-    const translateUrl = `${endpoint}/translate?api-version=3.0&to=${encodeURIComponent(
-      lang
-    )}`;
-
-    const body = [
-      {
-        text: text,
-      },
-    ];
-
-    try {
-      const response = await fetch(translateUrl, {
-        method: "POST",
-        headers: {
-          "Ocp-Apim-Subscription-Key": apiKey,
-          "Content-Type": "application/json; charset=UTF-8",
-          ...(region ? { "Ocp-Apim-Subscription-Region": region } : {}),
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        console.error(`Error translating to ${lang}: ${response.statusText}`);
-        translations[lang] = "Error occurred during translation";
-        continue;
-      }
-
-      const result = await response.json();
-      // result should look like:
-      // [
-      //   {
-      //     translations: [
-      //       {
-      //         text: "translated text",
-      //         to: "fr"
-      //       }
-      //     ]
-      //   }
-      // ]
-
-      if (
-        Array.isArray(result) &&
-        result[0] &&
-        Array.isArray(result[0].translations) &&
-        result[0].translations[0] &&
-        result[0].translations[0].text
-      ) {
-        translations[lang] = result[0].translations[0].text;
+      // Preserve the case of the input text
+      if (text === text.toUpperCase()) {
+        return translation.toUpperCase(); // Convert translation to uppercase
+      } else if (text === text.toLowerCase()) {
+        return translation.toLowerCase(); // Convert translation to lowercase
       } else {
-        translations[lang] = "No translation available";
+        return translation; // Return as-is for mixed case
       }
-    } catch (error) {
-      console.error(`Error translating to ${lang}:`, error.message);
-      translations[lang] = "Error occurred during translation";
     }
-  }
 
-  res.status(200).json({ translations });
-}
+    throw new Error("Unexpected response structure");
+  } catch (error) {
+    const err = error as any;
+    console.error(
+      "Error translating text:",
+      err.response ? err.response.data : err.message
+    );
+    throw error;
+  }
+};
+
+export const translateIntoMultipleLanguages = async (
+  text: string,
+  targetLanguages: string[],
+  fromLanguage: string = ""
+): Promise<{ language: string; translation: string }[]> => {
+  try {
+    const translations = await Promise.all(
+      targetLanguages.map(async (lang) => {
+        const translation = await translateText(text, lang, fromLanguage);
+        return { language: lang, translation };
+      })
+    );
+    return translations;
+  } catch (error) {
+    const err = error as any;
+    console.error(
+      "Error translating into multiple languages:",
+      err.response ? err.response.data : err.message
+    );
+    throw error;
+  }
+};
