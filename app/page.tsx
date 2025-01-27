@@ -1,10 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import {
-  translateIntoMultipleLanguages,
-  translateText,
-} from "./utils/translator";
+import { translateIntoMultipleLanguages } from "./utils/translator";
 
 const languages = [
   { code: "en", name: "English" },
