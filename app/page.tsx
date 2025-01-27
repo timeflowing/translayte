@@ -1,7 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { translateText } from "./utils/translator";
+import {
+  translateIntoMultipleLanguages,
+  translateText,
+} from "./utils/translator";
 
 const languages = [
   { code: "en", name: "English" },
@@ -29,6 +32,7 @@ const languages = [
 const TranslatorPage = () => {
   const [text, setText] = useState("");
   const [keyValue, setKeyValue] = useState("");
+  const [loading, setLoading] = useState(false);
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([
     "en",
     "cs",
@@ -45,20 +49,18 @@ const TranslatorPage = () => {
         : [...prev, languageCode]
     );
   };
-
   const handleTranslate = async () => {
+    setLoading(true); // Set loading to true
     try {
-      const results = await Promise.all(
-        selectedLanguages.map(async (lang) => {
-          const translation = await translateText(text, lang);
-          const languageName =
-            languages.find((l) => l.code === lang)?.name || lang;
-          return { language: languageName, translation };
-        })
+      const translations = await translateIntoMultipleLanguages(
+        text,
+        selectedLanguages
       );
-      setTranslations(results);
+      setTranslations(translations);
     } catch (error) {
-      console.error("Error during translation:", error);
+      console.error("Translation error:", error);
+    } finally {
+      setLoading(false); // Set loading to false
     }
   };
   const handleCopyJSONForTranslation = (
@@ -186,14 +188,18 @@ const TranslatorPage = () => {
           fontSize: "16px",
           fontWeight: "bold",
           backgroundColor: "#4CAF50",
+          flexDirection: "row",
+          flex: 2,
           color: "white",
           border: "none",
           borderRadius: "8px",
           cursor: "pointer",
         }}
       >
-        Translate
+        <span>Translate</span>{" "}
+        {loading && <div className="loading-spinner">Loading...</div>}
       </button>
+
       {translations.length > 0 && (
         <div
           style={{
