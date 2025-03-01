@@ -17,6 +17,12 @@ export const metadata: Metadata = {
   title: "Translayte - Effortless JSON Translation Tool",
   description:
     "Save time and reduce errors with our intuitive translation tool for React Native & beyond.",
+  icons: {
+    icon: [
+      { url: "/fav.svg", type: "image/svg+xml" },
+      // { url: "/favicon.ico", sizes: "32x32" }, // Fallback for browsers that don't support SVG
+    ],
+  },
 };
 
 export default function RootLayout({

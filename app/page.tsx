@@ -8,10 +8,11 @@ export default function LandingPage() {
       <header className="navbar">
         <div className="logo">Translayte</div>
         <nav>
-          <a href="#features">Features</a>
-          <a href="#pricing">Pricing</a>
-          <a href="#resources">Resources</a>
-          <a href="#contact">Contact</a>
+          {/* <a href="#features">Features</a> */}
+          <Link href="/dashboard">Dashboard Demo</Link>
+          <Link href="/pricing">Pricing</Link>
+          {/* <a href="#resources">Resources</a> */}
+          {/* <a href="#contact">Contact</a> */}
         </nav>
       </header>
 
@@ -62,13 +63,26 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="footer">
         <div className="footer-links">
-          <a href="/about">About</a>
-          <a href="/faq">FAQ</a>
-          <a href="/contact">Contact</a>
+          <Link href="/about">About</Link>
+          <Link href="/faq">FAQ</Link>
+          <Link href="/contact">Contact</Link>
         </div>
         <div className="footer-social">
-          <a href="https://twitter.com">Twitter</a>
-          <a href="https://linkedin.com">LinkedIn</a>
+          {/* External links can use regular anchor tags */}
+          <a
+            href="https://twitter.com"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Twitter
+          </a>
+          <a
+            href="https://linkedin.com"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            LinkedIn
+          </a>
         </div>
         <p>&copy; 2025 Translayte. All Rights Reserved.</p>
       </footer>
