@@ -9,6 +9,7 @@ export default function LandingPage() {
         <div className="logo">Translayte</div>
         <nav>
           {/* <a href="#features">Features</a> */}
+          <Link href="/blog">Blog</Link>
           <Link href="/dashboard">Dashboard Demo</Link>
           <Link href="/pricing">Pricing</Link>
           {/* <a href="#resources">Resources</a> */}
@@ -63,6 +64,11 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="footer">
         <div className="footer-links">
+          <Link href="/terms">Terms and conditions</Link>
+          <Link href="/privacy">Privacy</Link>
+          <Link href="/feedback">Feedback</Link>
+          <Link href="/integration">Integration</Link>
+          <Link href="/apidocumentation">Api documentation</Link>
           <Link href="/about">About</Link>
           <Link href="/faq">FAQ</Link>
           <Link href="/contact">Contact</Link>

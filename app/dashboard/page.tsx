@@ -36,6 +36,16 @@ const DashboardPage: React.FC = () => {
                 <text style={styles.navLink}>Support</text>
               </Link>
             </li>
+            <li>
+              <Link href="/profile">
+                <text style={styles.navLink}>Profil</text>
+              </Link>
+            </li>
+            <li>
+              <Link href="/notifications">
+                <text style={styles.navLink}>Notifications</text>
+              </Link>
+            </li>
           </ul>
         </nav>
       </aside>
