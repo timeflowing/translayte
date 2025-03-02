@@ -35,7 +35,7 @@ const dummyArticles: Article[] = [
 ];
 
 const ResourcesPage: React.FC = () => {
-  const [articles, setArticles] = useState<Article[]>(dummyArticles);
+  const [articles] = useState<Article[]>(dummyArticles);
 
   return (
     <div style={styles.container}>

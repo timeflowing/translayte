@@ -32,7 +32,7 @@ const dummyProjects: Project[] = [
 ];
 
 const ProjectsPage: React.FC = () => {
-  const [projects, setProjects] = useState<Project[]>(dummyProjects);
+  const [projects] = useState<Project[]>(dummyProjects);
 
   return (
     <div style={styles.container}>

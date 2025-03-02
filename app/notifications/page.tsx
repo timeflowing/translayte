@@ -10,7 +10,7 @@ interface Notification {
 }
 
 const NotificationsPage: React.FC = () => {
-  const [notifications, setNotifications] = useState<Notification[]>([
+  const [notifications] = useState<Notification[]>([
     {
       id: 1,
       type: "success",

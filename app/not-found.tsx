@@ -8,7 +8,8 @@ const NotFoundPage: React.FC = () => {
     <div style={styles.container}>
       <h1 style={styles.heading}>404 - Page Not Found- Tuuudle nuuudle </h1>
       <p style={styles.text}>
-        Oops! Taková smůla! We can't seem to find the page you're looking for.
+        Oops! Taková smůla! We can&apos;t seem to find the page you&apos;re
+        looking for.
       </p>
       <Link href="/">
         <text style={styles.link}>Skap</text>

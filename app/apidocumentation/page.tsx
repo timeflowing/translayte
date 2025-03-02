@@ -7,8 +7,8 @@ const DocumentationPage: React.FC = () => {
     <div style={styles.container}>
       <h1 style={styles.heading}>Developer Documentation</h1>
       <p style={styles.paragraph}>
-        Welcome to the Translayte API documentation. Below you'll find a list of
-        our endpoints along with example requests to help you integrate
+        Welcome to the Translayte API documentation. Below you&#39;ll find a
+        list of our endpoints along with example requests to help you integrate
         seamlessly.
       </p>
 

@@ -52,7 +52,9 @@ const DashboardPage: React.FC = () => {
       {/* Main Content */}
       <main style={styles.mainContent}>
         <h1>Welcome, [User Name]</h1>
-        <p>Here's an overview of your translation projects and usage stats.</p>
+        <p>
+          Here&apos;s an overview of your translation projects and usage stats.
+        </p>
         <div style={styles.cardContainer}>
           <div style={styles.card}>
             <h3>Total Projects</h3>
