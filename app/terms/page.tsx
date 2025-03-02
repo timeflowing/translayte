@@ -14,9 +14,23 @@ const TermsPage: React.FC = () => {
         <p style={styles.paragraph}>
           Welcome to Translayte. These Terms of Service (&quot;Terms&quot;)
           govern your use of the website www.translayte.it and any services
-          provided by Translayte (&quot;Service&quot;). By accessing or using
-          our Service, you agree to be bound by these Terms. If you do not agree
-          to these Terms, please do not use our Service.
+          provided by Translayte (&quot;Service&quot;).
+        </p>
+        <p style={styles.paragraph}>
+          <strong>Service Provider:</strong>
+          <br />
+          Vojtěch Tomášek
+          <br />
+          17.listopadu 7, Zábřeh
+          <br />
+          IČO: 08450897
+          <br />
+          Czech Republic
+        </p>
+        <p style={styles.paragraph}>
+          By accessing or using our Service, you agree to be bound by these
+          Terms. If you do not agree to these Terms, please do not use our
+          Service.
         </p>
       </section>
 
@@ -31,67 +45,61 @@ const TermsPage: React.FC = () => {
 
       <section style={styles.section}>
         <h2 style={styles.subHeading}>3. User Registration and Account</h2>
-        <p style={styles.paragraph}>
-          <ul style={styles.list}>
-            <li>Registration may be required to access certain features.</li>
-            <li>
-              You agree to provide accurate and current information during the
-              registration process.
-            </li>
-            <li>
-              You are responsible for maintaining the confidentiality of your
-              account credentials and for all activities that occur under your
-              account.
-            </li>
-            <li>
-              Translayte reserves the right to suspend or terminate your account
-              if you violate these Terms.
-            </li>
-          </ul>
-        </p>
+        <ul style={styles.list}>
+          <li>Registration may be required to access certain features.</li>
+          <li>
+            You agree to provide accurate and current information during the
+            registration process.
+          </li>
+          <li>
+            You are responsible for maintaining the confidentiality of your
+            account credentials and for all activities that occur under your
+            account.
+          </li>
+          <li>
+            Translayte reserves the right to suspend or terminate your account
+            if you violate these Terms.
+          </li>
+        </ul>
       </section>
 
       <section style={styles.section}>
         <h2 style={styles.subHeading}>4. Payment Terms</h2>
-        <p style={styles.paragraph}>
-          <ul style={styles.list}>
-            <li>
-              Some features of the Service are available on a subscription basis
-              or for a one-time fee.
-            </li>
-            <li>
-              All prices, fees, and billing terms are described on our website.
-            </li>
-            <li>
-              Payments are processed through authorized payment gateways (e.g.,
-              Stripe).
-            </li>
-            <li>
-              By subscribing to our Service, you agree to the billing terms and
-              authorize us to charge your chosen payment method.
-            </li>
-          </ul>
-        </p>
+        <ul style={styles.list}>
+          <li>
+            Some features of the Service are available on a subscription basis
+            or for a one-time fee.
+          </li>
+          <li>
+            All prices, fees, and billing terms are described on our website.
+          </li>
+          <li>
+            Payments are processed through authorized payment gateways (e.g.,
+            Stripe).
+          </li>
+          <li>
+            By subscribing to our Service, you agree to the billing terms and
+            authorize us to charge your chosen payment method.
+          </li>
+        </ul>
       </section>
 
       <section style={styles.section}>
         <h2 style={styles.subHeading}>5. Refunds and Cancellations</h2>
-        <p style={styles.paragraph}>
-          <ul style={styles.list}>
-            <li>
-              Refunds for paid services are provided in accordance with our
-              refund policy, which is available on our website.
-            </li>
-            <li>
-              Cancellation of subscriptions must be made in accordance with the
-              instructions provided on your account dashboard.
-            </li>
-            <li>
-              Translayte reserves the right to modify or cancel any service
-              without prior notice, subject to applicable laws.
-            </li>
-          </ul>
-        </p>
+        <ul style={styles.list}>
+          <li>
+            Refunds for paid services are provided in accordance with our refund
+            policy, which is available on our website.
+          </li>
+          <li>
+            Cancellation of subscriptions must be made in accordance with the
+            instructions provided on your account dashboard.
+          </li>
+          <li>
+            Translayte reserves the right to modify or cancel any service
+            without prior notice, subject to applicable laws.
+          </li>
+        </ul>
       </section>
 
       <section style={styles.section}>
@@ -104,41 +112,36 @@ const TermsPage: React.FC = () => {
 
       <section style={styles.section}>
         <h2 style={styles.subHeading}>7. Intellectual Property</h2>
-        <p style={styles.paragraph}>
-          <ul style={styles.list}>
-            <li>
-              All content, software, and technology available on Translayte are
-              protected by copyright, trademark, and other intellectual property
-              laws.
-            </li>
-            <li>
-              You may not reproduce, modify, distribute, or exploit any part of
-              our Service without express written consent from Translayte.
-            </li>
-          </ul>
-        </p>
+        <ul style={styles.list}>
+          <li>
+            All content, software, and technology available on Translayte are
+            protected by copyright, trademark, and other intellectual property
+            laws.
+          </li>
+          <li>
+            You may not reproduce, modify, distribute, or exploit any part of
+            our Service without express written consent from Translayte.
+          </li>
+        </ul>
       </section>
 
       <section style={styles.section}>
         <h2 style={styles.subHeading}>8. Limitation of Liability</h2>
-        <p style={styles.paragraph}>
-          <ul style={styles.list}>
-            <li>
-              The Service is provided &quot;as is&quot; without warranties of
-              any kind, either expressed or implied.
-            </li>
-            <li>
-              Translayte shall not be liable for any indirect, incidental, or
-              consequential damages arising out of or related to your use of the
-              Service, except in cases of gross negligence or willful
-              misconduct.
-            </li>
-            <li>
-              Our total liability under these Terms shall not exceed the amount
-              you paid to use our Service, if any.
-            </li>
-          </ul>
-        </p>
+        <ul style={styles.list}>
+          <li>
+            The Service is provided &quot;as is&quot; without warranties of any
+            kind, either expressed or implied.
+          </li>
+          <li>
+            Translayte shall not be liable for any indirect, incidental, or
+            consequential damages arising out of or related to your use of the
+            Service, except in cases of gross negligence or willful misconduct.
+          </li>
+          <li>
+            Our total liability under these Terms shall not exceed the amount
+            you paid to use our Service, if any.
+          </li>
+        </ul>
       </section>
 
       <section style={styles.section}>

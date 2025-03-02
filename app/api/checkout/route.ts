@@ -30,7 +30,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ sessionId: session.id });
   } catch (error: unknown) {
-    console.error("Stripe Checkout error:", error.message);
+    if (error instanceof Error) {
+      console.error("Stripe Checkout error:", error.message);
+    } else {
+      console.error("Stripe Checkout error:", error);
+    }
     return NextResponse.error();
   }
 }
