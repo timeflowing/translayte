@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@netlify/plugin-nextjs": "^5.9.4",
+    "@stripe/stripe-js": "^5.7.0",
     "axios": "^1.7.9",
     "netlify": "^13.2.0",
     "next": "15.0.4",
@@ -21,6 +22,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/stripe": "^8.0.416",
     "eslint": "^8",
     "eslint-config-next": "15.0.4",
     "postcss": "^8",

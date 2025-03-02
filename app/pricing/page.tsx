@@ -41,7 +41,7 @@ const PricingPage: React.FC = () => {
             <li>One-Time Payment</li>
             <li>Exclusive Support</li>
           </ul>
-          <Link href="/signup">Buy Now</Link>
+          <Link href="/payment">Buy Now</Link>
         </div>
       </div>
     </section>

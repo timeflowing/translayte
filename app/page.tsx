@@ -70,6 +70,7 @@ export default function LandingPage() {
           <Link href="/integration">Integration</Link>
           <Link href="/apidocumentation">Api documentation</Link>
           <Link href="/about">About</Link>
+          <Link href="/donate">Donate</Link>
           <Link href="/faq">FAQ</Link>
           <Link href="/careers">Careers</Link>
           <Link href="/roadmap">Roadmap</Link>
