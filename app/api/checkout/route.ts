@@ -3,38 +3,39 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 
-// Initialize Stripe with your secret key
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: "2025-02-24.acacia",
-});
-
 export async function POST(request: Request) {
   try {
+    // Initialize Stripe only at runtime
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
+      apiVersion: "2025-02-24.acacia", // Use a stable API version
+    });
+
     const { priceId } = await request.json();
 
     // Create a Stripe Checkout session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
-      mode: "subscription", // Change to "payment" for one-time payments
+      mode: "subscription",
       line_items: [
         {
-          price: priceId, // Use your actual Price ID from Stripe Dashboard
+          price: priceId,
           quantity: 1,
         },
       ],
-      success_url: `${request.headers.get(
-        "origin"
-      )}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${request.headers.get("origin")}/cancel`,
+      success_url: `${
+        request.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL
+      }/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${
+        request.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL
+      }/cancel`,
     });
 
     return NextResponse.json({ sessionId: session.id });
   } catch (error: unknown) {
-    if (error instanceof Error) {
-      console.error("Stripe Checkout error:", error.message);
-    } else {
-      console.error("Stripe Checkout error:", error);
-    }
-    return NextResponse.error();
+    console.error("Stripe error:", error);
+    return NextResponse.json(
+      { error: "Failed to create checkout session" },
+      { status: 500 }
+    );
   }
 }

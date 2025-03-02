@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 
-// Initialize the Stripe client with your secret key
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2025-02-24.acacia", // Use the latest API version
-});
-
 export async function POST(req: NextRequest) {
   try {
+    // Initialize Stripe only at runtime
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
+      apiVersion: "2025-02-24.acacia",
+    });
+
     const body = await req.json();
     const { donationAmount } = body;
 
@@ -37,18 +37,23 @@ export async function POST(req: NextRequest) {
       ],
       mode: "payment",
       success_url: `${
-        process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
+        process.env.NEXT_PUBLIC_SITE_URL ||
+        req.headers.get("origin") ||
+        "http://localhost:3000"
       }/donate-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${
-        process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
+        process.env.NEXT_PUBLIC_SITE_URL ||
+        req.headers.get("origin") ||
+        "http://localhost:3000"
       }/donate`,
     });
 
     return NextResponse.json({ sessionId: session.id });
-  } catch (error: unknown) {
-    console.error("Donation API error:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+  } catch {
+    console.error("Donation API error:");
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
