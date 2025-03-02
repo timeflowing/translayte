@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function LandingPage() {
   return (
@@ -29,10 +30,11 @@ export default function LandingPage() {
           </Link>
         </div>
         <div className="hero-video">
-          {/* Real image representing a coding/demo environment */}
-          <img
+          <Image
             src="https://source.unsplash.com/400x300/?programming"
             alt="Demo of Coding Environment"
+            width={400}
+            height={300}
           />
         </div>
       </section>
@@ -42,17 +44,21 @@ export default function LandingPage() {
         <h2>Why Developers Love Translayte</h2>
         <div className="feature-cards">
           <div className="card">
-            <img
+            <Image
               src="https://source.unsplash.com/60x60/?api,technology"
               alt="API Integration"
+              width={60}
+              height={60}
             />
             <h3>API Integration</h3>
             <p>Integrate seamlessly with your existing workflow.</p>
           </div>
           <div className="card">
-            <img
+            <Image
               src="https://source.unsplash.com/60x60/?translation,code"
               alt="Bulk Translation"
+              width={60}
+              height={60}
             />
             <h3>Bulk Translation</h3>
             <p>Translate large sets of keys effortlessly.</p>
