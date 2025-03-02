@@ -46,8 +46,16 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ sessionId: session.id });
-  } catch (error: any) {
-    console.error("Stripe Donation Error:", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error("Stripe Donation Error:", error.message);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    } else {
+      console.error("Stripe Donation Error:", error);
+      return NextResponse.json(
+        { error: "An unknown error occurred." },
+        { status: 500 }
+      );
+    }
   }
 }
