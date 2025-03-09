@@ -19,30 +19,6 @@ const PricingPage: React.FC = () => {
           </ul>
           <Link href="/signup">Get Started</Link>
         </div>
-        {/* Premium Tier */}
-        <div style={{ ...styles.pricingCard, ...styles.featuredCard }}>
-          <div style={styles.badge}>Most Popular</div>
-          <h3 style={styles.cardHeading}>Premium</h3>
-          <p style={styles.price}>$29/month</p>
-          <ul style={styles.list}>
-            <li>All Free Features</li>
-            <li>Bulk Translation</li>
-            <li>Advanced API Access</li>
-            <li>Priority Support</li>
-          </ul>
-          <Link href="/signup">Upgrade Now</Link>
-        </div>
-        {/* Lifetime Tier */}
-        <div style={styles.pricingCard}>
-          <h3 style={styles.cardHeading}>Lifetime</h3>
-          <p style={styles.price}>$199</p>
-          <ul style={styles.list}>
-            <li>All Premium Features</li>
-            <li>One-Time Payment</li>
-            <li>Exclusive Support</li>
-          </ul>
-          <Link href="/payment">Buy Now</Link>
-        </div>
       </div>
     </section>
   );
