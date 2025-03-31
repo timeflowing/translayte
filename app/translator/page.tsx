@@ -89,8 +89,12 @@ const TranslatorPage = () => {
       for (const lang of selectedLanguages) {
         result[lang] = {};
         for (const [key, value] of Object.entries(parsed)) {
-          const translated = await translateText(value, lang, "eng_Latn");
-          result[lang][key] = translated;
+          if (typeof value === "string") {
+            const translated = await translateText(value, lang, "eng_Latn");
+            result[lang][key] = translated;
+          } else {
+            console.warn(`Skipping key "${key}" as its value is not a string.`);
+          }
         }
       }
       setJsonTranslations(result);
