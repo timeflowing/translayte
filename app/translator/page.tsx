@@ -1,44 +1,53 @@
 "use client";
 
 import React, { useState } from "react";
-import { translateIntoMultipleLanguages } from "../utils/translator";
+import {
+  translateIntoMultipleLanguages,
+  translateText,
+} from "../utils/translator";
 
 const languages = [
-  { code: "en", name: "English" },
-  { code: "cs", name: "Czech" },
-  { code: "it", name: "Italian" },
-  { code: "bn", name: "Bengali" },
-  { code: "nl", name: "Dutch" },
-  { code: "fr", name: "French" },
-  { code: "de", name: "German" },
-  { code: "hi", name: "Hindi" },
-  { code: "ja", name: "Japanese" },
-  { code: "ko", name: "Korean" },
-  { code: "ms", name: "Malay" },
-  { code: "fa", name: "Persian" },
-  { code: "pl", name: "Polish" },
-  { code: "pt", name: "Portuguese" },
-  { code: "es", name: "Spanish" },
-  { code: "zh", name: "Chinese" },
-  { code: "ru", name: "Russian" },
-  { code: "tr", name: "Turkish" },
-  { code: "ar", name: "Arabic" },
-  { code: "vi", name: "Vietnamese" },
+  { code: "eng_Latn", name: "English" },
+  { code: "ces_Latn", name: "Czech" },
+  { code: "ita_Latn", name: "Italian" },
+  { code: "ben_Beng", name: "Bengali" },
+  { code: "nld_Latn", name: "Dutch" },
+  { code: "fra_Latn", name: "French" },
+  { code: "deu_Latn", name: "German" },
+  { code: "hin_Deva", name: "Hindi" },
+  { code: "jpn_Jpan", name: "Japanese" },
+  { code: "kor_Hang", name: "Korean" },
+  { code: "msa_Latn", name: "Malay" },
+  { code: "fas_Arab", name: "Persian" },
+  { code: "pol_Latn", name: "Polish" },
+  { code: "por_Latn", name: "Portuguese" },
+  { code: "spa_Latn", name: "Spanish" },
+  { code: "zho_Hans", name: "Chinese (Simplified)" },
+  { code: "rus_Cyrl", name: "Russian" },
+  { code: "tur_Latn", name: "Turkish" },
+  { code: "ara_Arab", name: "Arabic" },
+  { code: "vie_Latn", name: "Vietnamese" },
 ];
 
 const TranslatorPage = () => {
+  const [mode, setMode] = useState("text");
   const [text, setText] = useState("");
   const [keyValue, setKeyValue] = useState("");
   const [loading, setLoading] = useState(false);
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([
-    "en",
-    "cs",
-    "it",
+    "eng_Latn",
+    "ces_Latn",
+    "ita_Latn",
   ]);
   const [translations, setTranslations] = useState<
     { language: string; translation: string }[]
   >([]);
   const [copiedMessage, setCopiedMessage] = useState("");
+  const [jsonInput, setJsonInput] = useState("");
+  const [jsonTranslations, setJsonTranslations] = useState<
+    Record<string, Record<string, string>>
+  >({});
+
   const handleCheckboxChange = (languageCode: string) => {
     setSelectedLanguages((prev) =>
       prev.includes(languageCode)
@@ -46,237 +55,303 @@ const TranslatorPage = () => {
         : [...prev, languageCode]
     );
   };
+
   const handleTranslate = async () => {
-    setLoading(true); // Set loading to true
+    setLoading(true);
     try {
       const translations = await translateIntoMultipleLanguages(
         text,
-        selectedLanguages
+        selectedLanguages,
+        "eng_Latn"
       );
       setTranslations(translations);
     } catch (error) {
       console.error("Translation error:", error);
     } finally {
-      setLoading(false); // Set loading to false
+      setLoading(false);
     }
   };
-  const handleCopyJSONForTranslation = (
-    translation: string,
-    setCopiedMessage: (message: string) => void
-  ) => {
+
+  const handleCopyJSONForTranslation = (translation: string) => {
     const jsonSnippet = `"${keyValue}": "${translation}",`;
-    navigator.clipboard
-      .writeText(jsonSnippet)
-      .then(() => {
-        setCopiedMessage("Copied to clipboard!");
-        setTimeout(() => setCopiedMessage(""), 2000); // Clears the message after 2 seconds
-      })
-      .catch((err) => console.error("Failed to copy JSON snippet:", err));
+    navigator.clipboard.writeText(jsonSnippet).then(() => {
+      setCopiedMessage("Copied to clipboard!");
+      setTimeout(() => setCopiedMessage(""), 2000);
+    });
+  };
+
+  const handleJsonTranslate = async () => {
+    setLoading(true);
+    try {
+      const parsed = JSON.parse(jsonInput);
+      const result: Record<string, Record<string, string>> = {};
+
+      for (const lang of selectedLanguages) {
+        result[lang] = {};
+        for (const [key, value] of Object.entries(parsed)) {
+          const translated = await translateText(value, lang, "eng_Latn");
+          result[lang][key] = translated;
+        }
+      }
+      setJsonTranslations(result);
+    } catch {
+      alert("Invalid JSON");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const json = JSON.parse(reader.result as string);
+        setJsonInput(JSON.stringify(json, null, 2));
+      } catch {
+        alert("Invalid JSON file.");
+      }
+    };
+    reader.readAsText(file);
   };
 
   return (
-    <div
-      style={{
-        maxWidth: "800px",
-        margin: "40px auto",
-        padding: "20px",
-        fontFamily: "'Inter', sans-serif",
-        backgroundColor: "#ffffff",
-        borderRadius: "12px",
-        border: "1px solid #e0e0e0",
-      }}
-    >
-      <h1
-        style={{
-          textAlign: "center",
-          fontSize: "28px",
-          fontWeight: "600",
-          color: "#333",
-          marginBottom: "20px",
-        }}
-      >
-        Translator Tool
-      </h1>
-      {copiedMessage && (
-        <span
-          style={{
-            fontSize: "12px",
-            color: "green",
-            marginLeft: "10px",
-          }}
-        >
-          {copiedMessage}
-        </span>
-      )}
-      <div style={{ marginBottom: "20px" }}>
-        <input
-          type="text"
-          value={keyValue}
-          onChange={(e) => setKeyValue(e.target.value)}
-          placeholder="Enter key (e.g., welcomeMessage)"
-          style={{
-            width: "100%",
-            padding: "10px",
-            fontSize: "16px",
-            borderRadius: "8px",
-            border: "1px solid #ccc",
-            marginBottom: "10px",
-            color: "black",
-          }}
-        />
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Enter text to translate..."
-          style={{
-            width: "100%",
-            padding: "15px",
-            fontSize: "16px",
-            borderRadius: "8px",
-            border: "1px solid #ccc",
-            color: "black",
-            resize: "none",
-          }}
-          rows={4}
-        />
-      </div>
-      <div style={{ marginBottom: "20px" }}>
-        <h3 style={{ fontSize: "18px", color: "#333", marginBottom: "10px" }}>
-          Select Languages:
-        </h3>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
-            gap: "10px",
-          }}
-        >
-          {languages.map((lang) => (
-            <label
-              key={lang.code}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                fontSize: "16px",
-                cursor: "pointer",
-              }}
-            >
-              <input
-                type="checkbox"
-                value={lang.code}
-                checked={selectedLanguages.includes(lang.code)}
-                onChange={() => handleCheckboxChange(lang.code)}
-                style={{
-                  marginRight: "8px",
-                  accentColor: "#4CAF50",
-                  cursor: "pointer",
-                }}
-              />
-              {lang.name}
-            </label>
-          ))}
-        </div>
-      </div>
-      <button
-        onClick={handleTranslate}
-        style={{
-          width: "100%",
-          padding: "12px",
-          fontSize: "16px",
-          fontWeight: "bold",
-          backgroundColor: "#4CAF50",
-          flexDirection: "row",
-          flex: 2,
-          color: "white",
-          border: "none",
-          borderRadius: "8px",
-          cursor: "pointer",
-        }}
-      >
-        <span>Translate</span>{" "}
-        {loading && <div className="loading-spinner">Loading...</div>}
-      </button>
+    <div className="container">
+      <h1>🌍 Translator Tool</h1>
 
-      {translations.length > 0 && (
-        <div
-          style={{
-            marginTop: "30px",
-            padding: "20px",
-            backgroundColor: "#f9f9f9",
-            borderRadius: "12px",
-            border: "1px solid #e0e0e0",
-          }}
+      <div className="mode-toggle">
+        <button
+          className={mode === "text" ? "active" : ""}
+          onClick={() => setMode("text")}
         >
-          <h3
-            style={{
-              fontSize: "20px",
-              fontWeight: "500",
-              color: "#333",
-              marginBottom: "10px",
-            }}
+          Text Mode
+        </button>
+        <button
+          className={mode === "json" ? "active" : ""}
+          onClick={() => setMode("json")}
+        >
+          JSON Mode
+        </button>
+      </div>
+
+      <div className="language-grid">
+        {languages.map((lang) => (
+          <label key={lang.code}>
+            <input
+              type="checkbox"
+              value={lang.code}
+              checked={selectedLanguages.includes(lang.code)}
+              onChange={() => handleCheckboxChange(lang.code)}
+            />
+            {lang.name}
+          </label>
+        ))}
+      </div>
+
+      {mode === "text" && (
+        <>
+          {copiedMessage && (
+            <span className="copied-message">{copiedMessage}</span>
+          )}
+          <input
+            type="text"
+            value={keyValue}
+            onChange={(e) => setKeyValue(e.target.value)}
+            placeholder="Enter key (e.g., welcomeMessage)"
+            className="input"
+          />
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Enter text to translate..."
+            rows={4}
+            className="textarea"
+          />
+          <button
+            onClick={handleTranslate}
+            disabled={loading}
+            className="translate-btn"
           >
-            Translations:
-          </h3>
-          <div style={{ marginBottom: "15px" }}>
-            {translations.map((t, index) => (
-              <div key={index} style={{ marginBottom: "10px" }}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginTop: 30,
-                  }}
-                >
-                  <p
-                    style={{
-                      fontSize: "16px",
-                      fontWeight: "bold",
-                      color: "#333",
-                    }}
-                  >
-                    {t.language}:
-                  </p>
+            {loading ? "Translating..." : "Translate"}
+          </button>
+
+          {translations.length > 0 && (
+            <div className="translations">
+              <h3>Translations:</h3>
+              {translations.map((t, index) => (
+                <div key={index} className="translation-card">
+                  <strong>{t.language}:</strong>
+                  <p>{t.translation}</p>
                   <button
-                    onClick={() =>
-                      handleCopyJSONForTranslation(
-                        t.translation,
-                        setCopiedMessage
-                      )
-                    }
-                    style={{
-                      padding: "5px 10px",
-                      fontSize: "14px",
-                      backgroundColor: "#007bff",
-                      color: "white",
-                      border: "none",
-                      borderRadius: "8px",
-                      cursor: "pointer",
-                      marginBottom: 10,
-                    }}
+                    onClick={() => handleCopyJSONForTranslation(t.translation)}
                   >
                     Copy JSON
                   </button>
                 </div>
-
-                <pre
-                  style={{
-                    backgroundColor: "#fff",
-                    padding: "10px",
-                    borderRadius: "8px",
-                    border: "1px solid #ddd",
-                    fontSize: "14px",
-                    whiteSpace: "pre-wrap",
-                    color: "black",
-                  }}
-                >
-                  {`"${keyValue}": "${t.translation}",`}
-                </pre>
-              </div>
-            ))}
-          </div>
-        </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
+
+      {mode === "json" && (
+        <>
+          <div
+            className="drop-zone"
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              if (e.dataTransfer.files[0]) {
+                handleFileUpload(e.dataTransfer.files[0]);
+              }
+            }}
+          >
+            <p>📂 Drag & drop a JSON file here, or click below</p>
+            <input
+              type="file"
+              accept=".json"
+              onChange={(e) => {
+                if (e.target.files?.[0]) handleFileUpload(e.target.files[0]);
+              }}
+            />
+          </div>
+          <textarea
+            value={jsonInput}
+            onChange={(e) => setJsonInput(e.target.value)}
+            placeholder="Paste your JSON here..."
+            rows={10}
+            className="textarea"
+          />
+          <button
+            onClick={handleJsonTranslate}
+            disabled={loading}
+            className="translate-btn"
+          >
+            {loading ? "Translating..." : "Translate JSON"}
+          </button>
+
+          {Object.keys(jsonTranslations).length > 0 && (
+            <div className="translations">
+              <h3>JSON Translations:</h3>
+              {Object.entries(jsonTranslations).map(([lang, content]) => (
+                <div key={lang} className="translation-card">
+                  <strong>{lang}:</strong>
+                  <pre>{JSON.stringify(content, null, 2)}</pre>
+                  <button
+                    onClick={() => {
+                      const blob = new Blob(
+                        [JSON.stringify(content, null, 2)],
+                        { type: "application/json" }
+                      );
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `${lang}.json`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                  >
+                    Download JSON
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      <style jsx>{`
+        .container {
+          max-width: 800px;
+          margin: 40px auto;
+          padding: 30px;
+          background: #f9f9f9;
+          border-radius: 12px;
+          box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+          font-family: sans-serif;
+        }
+        h1 {
+          font-size: 28px;
+          margin-bottom: 20px;
+          text-align: center;
+        }
+        .input,
+        .textarea {
+          width: 100%;
+          padding: 12px;
+          margin-bottom: 15px;
+          border: 1px solid #ccc;
+          border-radius: 8px;
+          font-size: 16px;
+        }
+        .language-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+          gap: 10px;
+          margin: 10px 0 20px;
+        }
+        .translate-btn {
+          background-color: #4f46e5;
+          color: white;
+          padding: 12px 20px;
+          font-size: 16px;
+          border: none;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: background 0.3s;
+        }
+        .translate-btn:disabled {
+          background-color: #a5b4fc;
+          cursor: not-allowed;
+        }
+        .translate-btn:hover:not(:disabled) {
+          background-color: #4338ca;
+        }
+        .translations {
+          margin-top: 30px;
+        }
+        .translation-card {
+          background: white;
+          padding: 16px;
+          margin-bottom: 16px;
+          border-radius: 8px;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        .copied-message {
+          display: block;
+          color: green;
+          margin-bottom: 10px;
+        }
+        .mode-toggle {
+          display: flex;
+          justify-content: center;
+          margin-bottom: 20px;
+        }
+        .mode-toggle button {
+          background: #e5e7eb;
+          border: none;
+          padding: 10px 20px;
+          margin: 0 8px;
+          border-radius: 8px;
+          cursor: pointer;
+          font-weight: 500;
+          transition: all 0.2s;
+        }
+        .mode-toggle button.active {
+          background-color: #4f46e5;
+          color: white;
+        }
+        .drop-zone {
+          background: #f3f4f6;
+          border: 2px dashed #cbd5e1;
+          border-radius: 12px;
+          padding: 40px;
+          text-align: center;
+          margin-bottom: 20px;
+        }
+        .drop-zone:hover {
+          border-color: #4f46e5;
+        }
+      `}</style>
     </div>
   );
 };
