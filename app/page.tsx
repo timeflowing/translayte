@@ -1,7 +1,5 @@
 'use client';
 import React, { useEffect, useRef } from 'react';
-import NET from 'vanta/dist/vanta.net.min';
-import * as THREE from 'three';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import './translayte.css'; // holds gradient-text, btn-primary, feature-card, etc.
 
@@ -64,6 +62,7 @@ const LandingPage = () => {
 
         /* ------------------------------ loop ---------------------------- */
         const loop = () => {
+            if (!canvas || !ctx) return;
             rafRef.current = requestAnimationFrame(loop);
 
             // colour-pulse (0→1→0)
@@ -448,7 +447,15 @@ const LandingPage = () => {
 };
 
 /* -------------------------- helper sub-components ----------------------- */
-const CodeBlock = ({ title, badge, badgeColor, content, valueColor }) => (
+type CodeBlockProps = {
+    title: string;
+    badge: string;
+    badgeColor: 'green' | 'blue';
+    content: Record<string, string>;
+    valueColor: string;
+};
+
+const CodeBlock: React.FC<CodeBlockProps> = ({ title, badge, badgeColor, content, valueColor }) => (
     <div className="bg-black/40 backdrop-blur-md rounded-lg p-4 border border-gray-700/50">
         <div className="flex items-center justify-between mb-4">
             <div className="text-xs text-gray-400 uppercase tracking-wider">{title}</div>
@@ -467,8 +474,8 @@ const CodeBlock = ({ title, badge, badgeColor, content, valueColor }) => (
             <code className="text-gray-400 text-left block">{'{'}</code>
             {Object.entries(content).map(([k, v]) => (
                 <div key={k} className="pl-4 flex">
-                    <span className="text-orange-400">"{k}":</span>
-                    <span className={`${valueColor} ml-2`}>"{v}"</span>
+                    <span className="text-orange-400">&quot;{k}&quot;:</span>
+                    <span className={`${valueColor} ml-2`}>&quot;{v}&quot;</span>
                 </div>
             ))}
             <code className="text-gray-400 text-left block">{'}'}</code>
