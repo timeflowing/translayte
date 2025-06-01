@@ -16,8 +16,8 @@ import './translayte.css'; // holds gradient-text, btn-primary, feature-card, et
  *****************************************************************************************/
 
 const LandingPage = () => {
-    const canvasRef = useRef(null);
-    const rafRef = useRef(null);
+    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const rafRef = useRef<number | null>(null);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -47,15 +47,15 @@ const LandingPage = () => {
         const accent = [0xa7, 0x8b, 0xfa]; // #A78BFA
         let t = 0; // time for colour-lerp
 
-        const lerpChannel = (a, b, m) => Math.round(a + (b - a) * m);
-        const rgba = (mix, alpha = 1) =>
+        const lerpChannel = (a: number, b: number, m: number) => Math.round(a + (b - a) * m);
+        const rgba = (mix: number, alpha = 1) =>
             `rgba(${lerpChannel(primary[0], accent[0], mix)},` +
             `${lerpChannel(primary[1], accent[1], mix)},` +
             `${lerpChannel(primary[2], accent[2], mix)},${alpha})`;
 
         /* ------------------------------ mouse --------------------------- */
         const mouse = { x: -9999, y: -9999 };
-        const onMove = e => {
+        const onMove = (e: PointerEvent) => {
             mouse.x = e.clientX;
             mouse.y = e.clientY;
         };
@@ -129,7 +129,9 @@ const LandingPage = () => {
 
         /* ------------------------------ cleanup ------------------------- */
         return () => {
-            cancelAnimationFrame(rafRef.current);
+            if (rafRef.current !== null) {
+                cancelAnimationFrame(rafRef.current);
+            }
             window.removeEventListener('resize', resize);
             window.removeEventListener('pointermove', onMove);
         };
@@ -484,7 +486,14 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ title, badge, badgeColor, content
     </div>
 );
 
-const Section = ({ id, title, children, dark = false }) => (
+type SectionProps = {
+    id: string;
+    title: string | null;
+    children: React.ReactNode;
+    dark?: boolean;
+};
+
+const Section: React.FC<SectionProps> = ({ id, title, children, dark = false }) => (
     <section id={id} className={`py-20 ${dark ? 'bg-[#0f0f0f]' : ''}`}>
         <div className="container mx-auto px-4">
             {title && <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">{title}</h2>}
@@ -493,7 +502,19 @@ const Section = ({ id, title, children, dark = false }) => (
     </section>
 );
 
-const FeatureCard = ({ icon, title, children, variant = 'primary' }) => (
+type FeatureCardProps = {
+    icon: string;
+    title: string;
+    children: React.ReactNode;
+    variant?: 'primary' | 'dark';
+};
+
+const FeatureCard: React.FC<FeatureCardProps> = ({
+    icon,
+    title,
+    children,
+    variant = 'primary',
+}) => (
     <div
         className={`feature-card ${
             variant === 'dark' ? 'bg-[#0f0f0f]' : 'bg-primary/50'
@@ -509,7 +530,21 @@ const FeatureCard = ({ icon, title, children, variant = 'primary' }) => (
         <p className="text-gray-300">{children}</p>
     </div>
 );
-const PricingCard = ({ name, price, features, popular = false, gradient = false }) => (
+type PricingCardProps = {
+    name: string;
+    price: string;
+    features: string[];
+    popular?: boolean;
+    gradient?: boolean;
+};
+
+const PricingCard: React.FC<PricingCardProps> = ({
+    name,
+    price,
+    features,
+    popular = false,
+    gradient = false,
+}) => (
     <div
         className={`relative rounded-2xl p-8 border flex flex-col ${
             gradient
