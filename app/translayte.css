@@ -30,12 +30,25 @@
   transition-property: all; /* transition-all */
   transition-duration: 150ms;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+   box-shadow:
+      0 0 6px  rgba(139,92,246,.35),       /* soft inner edge      */
+      0 0 18px rgba(139,92,246,.45); 
 }
+#bg-animation::before{
+  content:'';
+  position:absolute;
+  inset:-15%;                  /* over-scan so the pan never shows edges */
+ background:linear-gradient(90deg,#8B5CF6 0%,#A78BFA 100%);
+  filter:blur(12px) brightness(1.4);
+  opacity:.85;
 
+  transition:opacity .35s ease,transform .35s ease;
+  z-index:-1;  
+}
 
 .btn-primary:hover {
   background: linear-gradient(90deg, #A78BFA,#8B5CF6); /* reversed on hover */
-  box-shadow: 0 10px 20px rgba(139, 92, 246, 0.2);
+  
 }
 
 /* duplicate the old scrollbar hide */

@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import './translayte.css'; // holds gradient-text, btn-primary, feature-card, etc.
 
@@ -16,6 +16,7 @@ import './translayte.css'; // holds gradient-text, btn-primary, feature-card, et
  *****************************************************************************************/
 
 const LandingPage = () => {
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const rafRef = useRef<number | null>(null);
 
@@ -33,12 +34,14 @@ const LandingPage = () => {
         window.addEventListener('resize', resize);
 
         /* ------------------------------ nodes --------------------------- */
-        const NODE_COUNT = 120; // bump up for denser mesh
-        const LINK_LIMIT = 140; // px distance where we draw line
+        // More synapses only on larger screens
+        const isLargeScreen = window.innerWidth >= 768; // Tailwind md: breakpoint
+        const NODE_COUNT = isLargeScreen ? 220 : 120; // More nodes on md+ screens
+        const LINK_LIMIT = isLargeScreen ? 180 : 140; // More links on md+ screens
         const nodes = Array.from({ length: NODE_COUNT }, () => ({
             x: Math.random() * canvas.width,
             y: Math.random() * canvas.height,
-            vx: (Math.random() - 0.5) * 0.4, // gentle drift
+            vx: (Math.random() - 0.5) * 0.4,
             vy: (Math.random() - 0.5) * 0.4,
         }));
 
@@ -137,6 +140,13 @@ const LandingPage = () => {
         };
     }, []);
 
+    // Optional: close menu on route change or resize
+    useEffect(() => {
+        const close = () => setMobileMenuOpen(false);
+        window.addEventListener('resize', close);
+        return () => window.removeEventListener('resize', close);
+    }, []);
+
     return (
         <>
             {/* Vanta target */}
@@ -166,10 +176,38 @@ const LandingPage = () => {
                     >
                         Sign In
                     </span>
-                    <button className="md:hidden text-white">
+                    <button
+                        className="md:hidden text-white"
+                        onClick={() => setMobileMenuOpen(v => !v)}
+                        aria-label="Open menu"
+                    >
                         <i className="fa-solid fa-bars text-xl" />
                     </button>
                 </div>
+                {/* Mobile menu */}
+                {mobileMenuOpen && (
+                    <div className="md:hidden bg-[#18181b] border-t border-gray-800 px-4 py-6">
+                        <nav className="flex flex-col space-y-4">
+                            {['How It Works', 'Benefits', 'Features', 'Pricing'].map(item => (
+                                <span
+                                    key={item}
+                                    className="text-gray-300 hover:text-white transition-colors cursor-pointer text-lg"
+                                    onClick={() => setMobileMenuOpen(false)}
+                                >
+                                    {item}
+                                </span>
+                            ))}
+                            <span
+                                className="mt-4 px-6 py-2 rounded-full border border-[#a78bfa] text-white font-medium hover:bg-[#a78bfa]/10 transition-colors cursor-pointer text-center"
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => setMobileMenuOpen(false)}
+                            >
+                                Sign In
+                            </span>
+                        </nav>
+                    </div>
+                )}
             </header>
 
             {/* ------------------------------ Hero ---------------------------- */}
@@ -194,7 +232,7 @@ const LandingPage = () => {
 
                     {/* ---------------- Translation preview window ---------------- */}
                     {/* (verbatim HTML → JSX; keys shortened for brevity) */}
-                    <div className="mt-16 bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl max-w-5xl mx-auto p-6">
+                    <div className="mt-10 bg-[#18181b]/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl w-full max-w-5xl mx-auto p-2 sm:p-6 overflow-x-auto">
                         {/* Window top bar */}
                         <div className="flex items-center space-x-2 mb-4">
                             <div className="w-3 h-3 rounded-full bg-red-500"></div>
@@ -204,9 +242,8 @@ const LandingPage = () => {
                                 translation-preview.json
                             </span>
                         </div>
-                        <div className="grid md:grid-cols-2 gap-1">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {/* Original block */}
-                            {/* Original block (EN) */}
                             <CodeBlock
                                 title="Original (English)"
                                 badge="EN"
@@ -248,7 +285,7 @@ const LandingPage = () => {
                         </div>
                         {/* language pills */}
                         <div className="mt-8 flex justify-center">
-                            <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-black/30 backdrop-blur-md text-sm text-gray-300 font-medium">
+                            <div className="flex flex-wrap items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-black/50 backdrop-blur-md text-sm text-gray-300 font-medium">
                                 <span>Also translating to:</span>
                                 {[
                                     { code: 'fr', color: 'blue' },
@@ -476,9 +513,13 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ title, badge, badgeColor, content
         <pre className="space-y-1 text-sm font-mono overflow-x-auto">
             <code className="text-gray-400 text-left block">{'{'}</code>
             {Object.entries(content).map(([k, v]) => (
-                <div key={k} className="pl-4 flex">
-                    <span className="text-orange-400">&quot;{k}&quot;:</span>
-                    <span className={`${valueColor} ml-2`}>&quot;{v}&quot;</span>
+                <div key={k} className="pl-4 flex flex-nowrap w-full max-sm:flex-wrap">
+                    <span className="text-orange-400 break-normal max-sm:break-all">
+                        &quot;{k}&quot;:
+                    </span>
+                    <span className={`${valueColor} ml-2 break-normal max-sm:break-all`}>
+                        &quot;{v}&quot;
+                    </span>
                 </div>
             ))}
             <code className="text-gray-400 text-left block">{'}'}</code>

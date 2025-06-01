@@ -271,18 +271,18 @@ body {
 /*  Animated Translayte background                                            */
 /* -------------------------------------------------------------------------- */
 
-#bg-animation {
-  position: fixed;
-  inset: 0;
-  z-index: -10;
-  overflow: hidden;
-}
 canvas {
   display: block;
   position: fixed;
   top: 0; left: 0; width: 100vw; height: 100vh;
   z-index: -10;
   pointer-events: none; /* optional: so clicks go through */
+}
+#bg-animation {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  overflow: hidden;
 }
 /* Base purple gradient that slowly drifts left → right */
 #bg-animation::before {
