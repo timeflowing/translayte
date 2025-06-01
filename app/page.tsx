@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import './translayte.css'; // holds gradient-text, btn-primary, feature-card, etc.
+import Link from 'next/link';
 
 /*****************************************************************************************
  *  FULL Translaytelanding page – React + Tailwind + Vanta.NET                        *
@@ -36,7 +37,7 @@ const LandingPage = () => {
         /* ------------------------------ nodes --------------------------- */
         // More synapses only on larger screens
         const isLargeScreen = window.innerWidth >= 768; // Tailwind md: breakpoint
-        const NODE_COUNT = isLargeScreen ? 220 : 120; // More nodes on md+ screens
+        const NODE_COUNT = isLargeScreen ? 260 : 120; // More nodes on md+ screens
         const LINK_LIMIT = isLargeScreen ? 180 : 140; // More links on md+ screens
         const nodes = Array.from({ length: NODE_COUNT }, () => ({
             x: Math.random() * canvas.width,
@@ -225,9 +226,11 @@ const LandingPage = () => {
                     {/* CTA */}
                     <div className="relative group inline-block">
                         <div className="absolute -inset-0.5 bg-gradient-to-r from-secondary to-accent rounded-full blur opacity-70 group-hover:opacity-100 transition duration-1000 group-hover:duration-200" />
-                        <button className="relative btn-primary text-white font-medium px-8 py-4 rounded-full">
-                            <i className="fa-solid fa-upload mr-2" /> Upload JSON to Translate
-                        </button>
+                        <Link href="/translator">
+                            <button className="relative btn-primary text-white font-medium px-8 py-4 rounded-full">
+                                <i className="fa-solid fa-upload mr-2" /> Upload JSON to Translate
+                            </button>
+                        </Link>
                     </div>
 
                     {/* ---------------- Translation preview window ---------------- */}
