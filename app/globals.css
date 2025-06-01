@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,6 +7,7 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
 }
 
 @media (prefers-color-scheme: dark) {
@@ -14,10 +17,18 @@
   }
 }
 
+body, html {
+  user-select: none;
+  -webkit-user-select: none; /* Safari */
+  -ms-user-select: none;     /* IE10+/Edge */
+    cursor: default;
+}
+
 body {
-  color: var(--foreground); /* Ensure text color matches the foreground */
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', sans-serif;
+  background-color: #0F0F0F;
+  color: white;
+
 }
 
 .translator-container {
@@ -82,7 +93,7 @@ body {
   color: white;
   border: none;
   border-radius: 8px;
-  cursor: pointer;
+  
 }
 
 .translate-button[disabled] {
@@ -182,20 +193,6 @@ body {
   color: #555;
 }
 
-.btn-primary {
-  display: inline-block;
-  padding: 15px 30px;
-  background-color: #007BFF;
-  color: #fff;
-  border-radius: 5px;
-  text-decoration: none;
-  transition: background-color 0.3s ease;
-}
-
-.btn-primary:hover {
-  background-color: #0056b3;
-}
-
 /* Features Section */
 .features {
   padding: 60px 20px;
@@ -233,6 +230,14 @@ body {
   margin-bottom: 20px;
 }
 
+.feature-card {
+  transition: all 0.3s ease;
+}
+
+.feature-card:hover {
+  transform: translateY(-5px);
+}
+
 /* Footer */
 .footer {
   background-color: #333;
@@ -245,4 +250,78 @@ body {
   color: #fff;
   text-decoration: none;
   margin: 0 10px;
+}
+
+#bg-animation {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+}
+
+.gradient-text {
+  background: linear-gradient(90deg, #8B5CF6, #A78BFA);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Animated Translayte background                                            */
+/* -------------------------------------------------------------------------- */
+
+#bg-animation {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  overflow: hidden;
+}
+canvas {
+  display: block;
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  z-index: -10;
+  pointer-events: none; /* optional: so clicks go through */
+}
+/* Base purple gradient that slowly drifts left → right */
+#bg-animation::before {
+  content: '';
+  position: absolute;
+  inset: -10%;                /* overscan so panning never shows edges */
+  background: linear-gradient(
+      130deg,
+      #12001b 0%,
+      #3b008b 25%,
+      #8b5cf6 50%,
+      #a78bfa 75%,
+      #12001b 100%
+  );
+  background-size: 400% 400%;
+  animation: gradientShift 14s ease-in-out infinite;
+}
+
+/* Thin intersecting lines that glide diagonally (like a subtle “net”) */
+#bg-animation::after {
+  content: '';
+  position: absolute;
+  inset: -10%;
+  background-image:
+      repeating-linear-gradient(60deg, rgba(255,255,255,0.05) 0 2px, transparent 2px 120px),
+      repeating-linear-gradient(-60deg, rgba(255,255,255,0.05) 0 2px, transparent 2px 120px);
+  background-size: 200% 200%;
+  animation: gridDrift 30s linear infinite;
+}
+
+/* KEYFRAMES --------------------------------------------------------------- */
+
+@keyframes gradientShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes gridDrift {
+  0%   { background-position: 0% 0%; }
+  100% { background-position: -200% -200%; }
 }
