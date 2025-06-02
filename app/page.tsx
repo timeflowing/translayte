@@ -80,14 +80,22 @@ const LandingPage = () => {
             /* move + draw nodes */
             ctx.fillStyle = rgba(mix, 0.9);
             nodes.forEach((n, idx) => {
-                // Subtle oscillation: each node moves gently left/right in a sine wave, phase-shifted by index
-                const base = 0.5; // amplitude in px, tweak for more/less movement
-                const speed = 0.6; // tweak for slower/faster oscillation
-                n.x += Math.sin(t * speed + idx) * base * 0.03; // subtle horizontal oscillation
+                // Much slower, more subtle oscillation
+                const oscX = Math.sin(t * 0.15 + idx) * 0.045;
+                const oscY = Math.cos(t * 0.12 + idx) * 0.045;
 
-                // basic drift
+                n.x += oscX;
+                n.y += oscY;
+
+                // basic drift (optional, can be reduced for more "floaty" effect)
                 n.x += n.vx;
                 n.y += n.vy;
+
+                // --- wrap around edges for continuous field ---
+                if (n.x < 0) n.x = canvas.width;
+                if (n.x > canvas.width) n.x = 0;
+                if (n.y < 0) n.y = canvas.height;
+                if (n.y > canvas.height) n.y = 0;
 
                 // mouse interaction (mild repulsion / attraction)
                 const dx = n.x - mouse.x;
