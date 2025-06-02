@@ -242,7 +242,7 @@ const LandingPage = () => {
 
                     {/* ---------------- Translation preview window ---------------- */}
                     {/* (verbatim HTML → JSX; keys shortened for brevity) */}
-                    <div className="mt-10 bg-[#18181b]/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl w-full max-w-5xl mx-auto p-2 sm:p-6 overflow-x-auto">
+                    <div className="mt-10 mb-20 bg-[#18181b]/70 rounded-xl border border-white/10 shadow-2xl w-full max-w-5xl mx-auto p-2 sm:p-6 overflow-x-auto backdrop-blur-md backdrop-saturate-150">
                         {/* Window top bar */}
                         <div className="flex items-center space-x-2 mb-4">
                             <div className="w-3 h-3 rounded-full bg-red-500"></div>

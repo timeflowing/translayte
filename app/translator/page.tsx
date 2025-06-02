@@ -1,9 +1,9 @@
 'use client';
 import React, { useRef, useState, ChangeEvent, useEffect } from 'react';
 import '@fortawesome/fontawesome-free/css/all.min.css';
-import { translateIntoMultipleLanguagesx, translateText } from '../utils/translator';
-import NET from 'vanta/dist/vanta.net.min';
-import * as THREE from 'three';
+import { translateText } from '../utils/translator';
+import Image from 'next/image';
+
 /* ---------------------------------------------------------------- data */
 const LANGUAGE_OPTIONS = [
     { code: 'eng_Latn', name: 'English', shortcut: 'EN' },
@@ -30,7 +30,7 @@ const LANGUAGE_OPTIONS = [
 
 /* handy maps */
 const SHORTCUT_TO_CODE = Object.fromEntries(LANGUAGE_OPTIONS.map(l => [l.shortcut, l.code]));
-const CODE_TO_SHORTCUT = Object.fromEntries(LANGUAGE_OPTIONS.map(l => [l.code, l.shortcut]));
+// const CODE_TO_SHORTCUT = Object.fromEntries(LANGUAGE_OPTIONS.map(l => [l.code, l.shortcut]));
 
 /* ---------------------------------------------------------------- page */
 export default function TranslatorPage() {
@@ -56,11 +56,24 @@ export default function TranslatorPage() {
         Record<string, Record<string, string>>
     >({});
 
+    /* language selection info */
+    const [langLimitInfo, setLangLimitInfo] = useState<string | null>(null);
+
     /* ------------- helpers */
     const toggleLanguage = (shortcut: string) => {
         setSelectedShortcuts(prev => {
             const next = new Set(prev);
-            next.has(shortcut) ? next.delete(shortcut) : next.add(shortcut);
+            if (next.has(shortcut)) {
+                next.delete(shortcut);
+                setLangLimitInfo(null); // clear info on deselect
+            } else {
+                if (next.size >= 2) {
+                    setLangLimitInfo('Upgrade to Pro to select more than 2 languages.');
+                    return prev; // Prevent selecting more than 2
+                }
+                next.add(shortcut);
+                setLangLimitInfo(null); // clear info on select
+            }
             return next;
         });
     };
@@ -155,16 +168,35 @@ export default function TranslatorPage() {
                         {/* -----  file mode  ----- */}
                         {mode === 'file' && (
                             <>
-                                {/* drop zone */}
                                 <DropZone onSelect={handleFileUpload} />
+                                {/* ─────────────────────────  JSON Editor  ───────────────────────── */}
+                                <div className="relative mt-6 w-full max-w-3xl mx-auto">
+                                    {/* top bar */}
+                                    <div className="absolute inset-x-0 top-0 h-10 rounded-t-xl bg-[#1b1533] border-b border-[#302456] flex items-center justify-between px-4">
+                                        <span className="text-sm text-gray-400 select-none">
+                                            Paste or edit your JSON here…
+                                        </span>
 
-                                {/* json textarea */}
-                                <textarea
-                                    value={jsonInput}
-                                    onChange={e => setJsonInput(e.target.value)}
-                                    placeholder="// or paste JSON here…"
-                                    className="w-full mt-4 h-48 bg-[#18103a] border border-[#2d2250] rounded-xl p-4 text-gray-300 font-mono text-sm focus:ring-secondary focus:outline-none"
-                                />
+                                        <span className="px-3 py-1 rounded-md bg-[#34384b] text-xs font-semibold text-gray-300 tracking-wider select-none">
+                                            JSON
+                                        </span>
+                                    </div>
+
+                                    {/* textarea */}
+                                    <textarea
+                                        value={jsonInput}
+                                        onChange={e => setJsonInput(e.target.value)}
+                                        spellCheck={false}
+                                        placeholder="{}"
+                                        className="w-full h-56 resize-none bg-[#1e1739] rounded-b-xl border border-[#302456] pt-12 pb-4 px-4 font-mono text-sm text-gray-100 focus:border-[#8B5CF6] focus:ring-2 focus:ring-secondary/30 outline-none placeholder-gray-500 shadow-inner transition-colors"
+                                        style={{
+                                            boxShadow: 'none',
+                                            borderWidth: '1px',
+                                            borderStyle: 'solid',
+                                            borderColor: '#302456',
+                                        }}
+                                    />
+                                </div>
                             </>
                         )}
 
@@ -172,7 +204,7 @@ export default function TranslatorPage() {
                         {mode === 'keys' && <KeyTable rows={rows} setRows={setRows} />}
 
                         {/* toggles */}
-                        <div className="bg-[#030303]/70 backdrop-blur-sm rounded-lg p-4 mt-10 flex flex-col sm:flex-row sm:justify-between gap-4">
+                        <div className="bg-[#191919]/70 backdrop-blur-sm rounded-lg p-4 mt-10 flex flex-col sm:flex-row sm:justify-between gap-4">
                             <Toggle
                                 label="Keep keys order"
                                 checked={keepOrder}
@@ -181,35 +213,67 @@ export default function TranslatorPage() {
                             <Toggle label="Minify output" checked={minify} onChange={setMinify} />
                         </div>
 
-                        {/* buttons */}
-                        <div className="flex flex-col sm:flex-row items-center gap-4 mt-10">
-                            <TranslateButton onClick={handleTranslate} loading={isTranslating} />
-                            <button
-                                onClick={handleReset}
-                                className="px-6 py-3 border border-gray-700 rounded-full text-gray-300 hover:bg-gray-800 transition-colors"
-                            >
-                                Reset
-                            </button>
-                        </div>
+                        {/* Language selection info */}
                     </section>
 
                     {/* ------------ picker ------------ */}
-                    <aside className="w-full lg:w-5/12 bg-[#030303]/80 backdrop-blur-sm rounded-xl p-6 border border-gray-800 h-fit sticky top-24">
-                        <header className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-medium">Choose target languages</h3>
-                            <span className="text-base text-gray-200">
-                                Selected{' '}
-                                <span
-                                    className="font-semibold"
-                                    style={{ color: '#8B5CF6', fontSize: '1.1em' }}
-                                >
-                                    {selectedShortcuts.size}
-                                </span>{' '}
-                                / {LANGUAGE_OPTIONS.length}
-                            </span>
-                        </header>
+                    <aside className="w-full lg:w-5/12 h-fit sticky top-24">
+                        <div className="bg-[#191919]/80 backdrop-blur-sm rounded-xl p-6 border border-gray-800">
+                            {/* Lang limit info as a tab on top */}
+                            <header className="flex justify-between items-center mb-6">
+                                <h3 className="text-xl font-medium">Choose target languages</h3>
+                                <span className="text-base text-gray-200 font-semibold">
+                                    <span style={{ color: '#a78bfa' }}> Selected </span>
+                                    <span
+                                        className="font-semibold"
+                                        style={{ color: '#a78bfa', fontSize: '1.1em' }}
+                                    >
+                                        {selectedShortcuts.size}
+                                    </span>{' '}
+                                    / {LANGUAGE_OPTIONS.length}
+                                </span>
+                            </header>
 
-                        <LanguageGrid selected={selectedShortcuts} toggle={toggleLanguage} />
+                            <LanguageGrid selected={selectedShortcuts} toggle={toggleLanguage} />
+
+                            {langLimitInfo && (
+                                <div
+                                    className=" top-20 left-6 right-6 flex items-center gap-3 px-4 py-3 rounded-t-lg bg-gradient-to-r from-[#8B5CF6]/90 to-[#7C3AED]/90 border border-[#8B5CF6] shadow-lg z-10"
+                                    style={{ marginBottom: '-1.5rem' }}
+                                >
+                                    <i className="fa-solid fa-crown text-yellow-300 text-xl drop-shadow mr-2" />
+                                    <div className="flex-1">
+                                        <div className="font-semibold text-white text-base mb-0.5">
+                                            Pro plan required
+                                        </div>
+                                        <div className="text-sm text-gray-200 opacity-80">
+                                            Upgrade to{' '}
+                                            <span className="font-semibold text-yellow-200">
+                                                Translayte Pro
+                                            </span>{' '}
+                                            to translate into more than 2 languages at once.
+                                        </div>
+                                    </div>
+                                    <a
+                                        href="/pricing"
+                                        className="ml-2 px-4 py-2 rounded-full bg-yellow-400 text-gray-900 font-semibold shadow hover:bg-yellow-300 transition"
+                                    >
+                                        Upgrade
+                                    </a>
+                                </div>
+                            )}
+                        </div>
+                        {/* buttons */}
+                        <div className="flex flex-col sm:flex-row gap-4 mt-4">
+                            <TranslateButton onClick={handleTranslate} loading={isTranslating} />
+                            <button
+                                onClick={handleReset}
+                                disabled={isTranslating}
+                                className="inline-flex items-center justify-center px-8 py-4 rounded-lg font-semibold text-gray-200 bg-[#191919]/80"
+                            >
+                                <i className="fa-solid fa-rotate-left mr-2" />
+                            </button>
+                        </div>
                     </aside>
                 </div>
             </main>
@@ -218,7 +282,6 @@ export default function TranslatorPage() {
 }
 
 /* ---------------------------------------------------------------- small ui helpers (unstyled) */
-
 const ModeSwitcher = ({
     mode,
     setMode,
@@ -227,94 +290,234 @@ const ModeSwitcher = ({
     setMode: React.Dispatch<React.SetStateAction<'file' | 'keys'>>;
 }) => (
     <div className="flex justify-center mb-10">
-        <div className="inline-flex bg-[#18103a]/90 rounded-xl shadow-lg border border-[#2d2250] overflow-hidden">
-            {(['file', 'keys'] as const).map(m => (
-                <button
-                    key={m}
-                    className={`px-8 py-3 font-semibold text-base transition
-            ${mode === m ? 'bg-gradient-to-r from-secondary to-accent text-white' : 'text-gray-400'}
-          `}
-                    style={{
-                        borderRight: m === 'file' ? '1px solid #2d2250' : undefined,
-                        minWidth: 170,
-                    }}
-                    onClick={() => setMode(m)}
-                >
-                    <i className={`fa-${m === 'file' ? 'regular fa-file' : 'solid fa-key'} mr-2`} />
-                    {m === 'file' ? 'Translate File' : 'Translate Keys Only'}
-                </button>
-            ))}
+        {/* outer pill */}
+        <div className="inline-flex w-full max-w-xl rounded-xl overflow-hidden shadow-lg">
+            {(['file', 'keys'] as const).map((m, idx) => {
+                const active = mode === m;
+                return (
+                    <button
+                        key={m}
+                        onClick={() => setMode(m)}
+                        className={`flex items-center gap-2 justify-center flex-1 py-4 font-semibold text-base transition-colors
+              ${active ? 'bg-[#22173d] text-white' : 'bg-[#0F0F0F] text-gray-200'}
+            `}
+                        style={{
+                            borderLeft: idx === 1 ? '1px solid #151515' : undefined,
+                        }}
+                    >
+                        <i
+                            className={`${
+                                m === 'file' ? 'fa-solid fa-file-arrow-up' : 'fa-solid fa-key'
+                            } text-lg ${active ? 'text-white' : 'text-gray-400'}`}
+                        />
+                        {m === 'file' ? 'Translate File' : 'Translate Keys Only'}
+                    </button>
+                );
+            })}
         </div>
     </div>
 );
-/* prettier-ignore */ const DropZone: React.FC<Props> = ({ onSelect }) => {
-  const vantaRef = useRef<HTMLDivElement | null>(null);   // ← Vanta mounts here
-  const zoneRef  = useRef<HTMLLabelElement | null>(null); // for focus & size
 
-  /* mount Vanta just once */
-  useEffect(() => {
-    if (!vantaRef.current) return;
+interface DZProps {
+    onSelect: (e: ChangeEvent<HTMLInputElement>) => void;
+}
+const DropZone: React.FC<DZProps> = ({ onSelect }) => {
+    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const [drag, setDrag] = useState(false);
+    const dragRef = useRef(false);
+    const pointer = useRef<{ x: number; y: number } | null>(null);
 
-    const vanta = NET({
-      el: vantaRef.current,
-      THREE,
-      mouseControls: true,
-      touchControls: true,
-      gyroControls: false,
-      minHeight: 200,
-      minWidth: 200,
-      scale: 1,
-      scaleMobile: 1,
-      color: 0x8B5CF6,
-      backgroundColor: 0x0F0F0F,
-      points: 8,
-      maxDistance: 20,
-      spacing: 16,
-    });
+    // Keep drag state in a ref for animation
+    useEffect(() => {
+        dragRef.current = drag;
+    }, [drag]);
 
-    return () => vanta?.destroy();          // cleanup on unmount
-  }, []);
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
 
-  return (
-    <label
-      ref={zoneRef}
-      htmlFor="file-upload"
-      className="relative flex flex-col items-center justify-center h-64 mb-6
-                 rounded-xl cursor-pointer overflow-hidden"
-      style={{ border: '2px dashed #8B5CF6' }}   /* violet dashed frame */
-    >
-      {/* Vanta canvas lives in this absolutely-positioned div */}
-      <div ref={vantaRef} className="absolute inset-0 -z-10" />
+        const DPR = window.devicePixelRatio || 1;
+        const resize = () => {
+            canvas.width = canvas.offsetWidth * DPR;
+            canvas.height = canvas.offsetHeight * DPR;
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.scale(DPR, DPR);
+        };
+        resize();
+        window.addEventListener('resize', resize);
 
-      {/* hidden file input */}
-      <input
-        id="file-upload"
-        type="file"
-        accept=".json,.js"
-        className="sr-only"
-        onChange={onSelect}
-      />
+        // Only create particles once
+        const N = 120;
+        const particles = Array.from({ length: N }, () => ({
+            x: Math.random() * canvas.offsetWidth,
+            y: Math.random() * canvas.offsetHeight,
+            vx: (Math.random() - 0.5) * 0.35,
+            vy: (Math.random() - 0.5) * 0.35,
+        }));
 
-      {/* foreground content */}
-      <div className="relative z-10 flex flex-col items-center text-center px-4">
-        <div className="w-16 h-16 mb-5 rounded-full bg-secondary/10 flex items-center justify-center">
-          <i className="fa-solid fa-file-arrow-up text-2xl text-secondary" />
-        </div>
+        let frame: number;
+        const loop = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Add opacity to the background fill (e.g. 0.85)
+            ctx.globalAlpha = 0.85;
+            ctx.fillStyle = '#0F0F0F';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.globalAlpha = 1;
 
-        <p className="text-lg font-medium">Drop your JSON file here</p>
-        <p className="text-gray-400 text-sm mb-6">or</p>
+            // move
+            particles.forEach(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                if (p.x < 0 || p.x > canvas.offsetWidth) p.vx *= -1;
+                if (p.y < 0 || p.y > canvas.offsetHeight) p.vy *= -1;
+            });
 
-        <span className="relative inline-flex items-center justify-center px-8 py-2
-                          rounded-full text-white border border-[#8B5CF6]">
-          Browse files
-        </span>
+            // More synapses: lower the distance threshold
+            ctx.strokeStyle = dragRef.current ? '#8B5CF6' : '#5034b5';
+            ctx.lineWidth = 0.6;
+            for (let i = 0; i < N; i++) {
+                for (let j = i + 1; j < N; j++) {
+                    const a = particles[i];
+                    const b = particles[j];
+                    const dx = a.x - b.x;
+                    const dy = a.y - b.y;
+                    const dist2 = dx * dx + dy * dy;
+                    if (dist2 < 120 * 120) {
+                        ctx.globalAlpha = 1 - dist2 / (120 * 120);
+                        ctx.beginPath();
+                        ctx.moveTo(a.x, a.y);
+                        ctx.lineTo(b.x, b.y);
+                        ctx.stroke();
+                    }
+                }
+            }
+            ctx.globalAlpha = 1;
 
-        <p className="text-gray-500 text-xs mt-6 flex items-center">
-          <i className="fa-solid fa-lock mr-2" /> Your file never leaves this device
-        </p>
-      </div>
-    </label>
-  );
+            // synapse lines to cursor while dragging
+            if (dragRef.current && pointer.current) {
+                ctx.strokeStyle = '#8B5CF6';
+                particles.forEach(p => {
+                    const dx = p.x - pointer.current!.x;
+                    const dy = p.y - pointer.current!.y;
+                    const d2 = dx * dx + dy * dy;
+                    if (d2 < 180 * 180) {
+                        ctx.globalAlpha = 1 - d2 / (180 * 180);
+                        ctx.beginPath();
+                        ctx.moveTo(p.x, p.y);
+                        ctx.lineTo(pointer.current!.x, pointer.current!.y);
+                        ctx.stroke();
+                    }
+                });
+                ctx.globalAlpha = 1;
+            }
+
+            // particles
+            ctx.fillStyle = '#8B5CF6';
+            particles.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            frame = requestAnimationFrame(loop);
+        };
+        loop();
+
+        return () => {
+            cancelAnimationFrame(frame);
+            window.removeEventListener('resize', resize);
+        };
+    }, []);
+
+    /* ---------------- render */
+    return (
+        <label
+            onDragEnter={e => {
+                e.preventDefault();
+                setDrag(true);
+                const rect = (e.target as HTMLElement).getBoundingClientRect();
+                pointer.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+            }}
+            onDragOver={e => {
+                e.preventDefault();
+                const rect = (e.target as HTMLElement).getBoundingClientRect();
+                pointer.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+            }}
+            onDragLeave={() => {
+                setDrag(false);
+                pointer.current = null;
+            }}
+            onDrop={e => {
+                e.preventDefault();
+                setDrag(false);
+                pointer.current = null;
+                const file = e.dataTransfer.files?.[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        try {
+                            JSON.parse(reader.result as string);
+                            // Create a mock FileList with the required 'item' method
+                            const files: FileList = {
+                                0: file,
+                                length: 1,
+                                item: (index: number) => (index === 0 ? file : null),
+                                [Symbol.iterator]: function* () {
+                                    yield file;
+                                },
+                            } as unknown as FileList;
+                            onSelect({ target: { files } } as ChangeEvent<HTMLInputElement>);
+                        } catch {
+                            alert('Invalid JSON');
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+            }}
+            htmlFor="file-upload"
+            className={`relative flex flex-col items-center justify-center h-60 mb-8  border-dashed rounded-xl cursor-pointer overflow-hidden transition-colors duration-200 ${
+                drag ? 'border-[#8B5CF6] bg-[#1a1333]/80' : 'border-[#8B5CF633] bg-transparent'
+            }`}
+            style={
+                {
+                    // Remove background color from label, let canvas handle it
+                }
+            }
+        >
+            {/* Canvas for animation */}
+            <canvas
+                ref={canvasRef}
+                className="absolute inset-0 rounded-xl pointer-events-none"
+                style={{ zIndex: 0 }}
+            />
+            {/* Content always above the canvas */}
+            <div className="relative z-10 flex flex-col items-center text-center px-4 pointer-events-none select-none">
+                <i
+                    className="fa-solid fa-cloud-arrow-up text-4xl mb-4"
+                    style={{ color: '#8B5CF6' }}
+                />
+
+                <p className="text-lg font-semibold">Drop your JSON file here</p>
+                <p className="text-gray-400 text-sm">or click to browse</p>
+                <span
+                    className="mt-4 relative inline-flex items-center justify-center px-6 py-2
+               bg-[#8B5CF6]/20 rounded-lg font-bold text-base border"
+                    style={{ color: '#8B5CF6', borderColor: '#a78bfa', borderWidth: 1 }}
+                >
+                    Browse files
+                </span>
+            </div>
+            <input
+                id="file-upload"
+                type="file"
+                accept=".json"
+                onChange={onSelect}
+                className="sr-only"
+            />
+        </label>
+    );
 };
 
 const KeyTable = ({
@@ -389,56 +592,104 @@ const KeyTable = ({
         </div>
     );
 };
-
 const LanguageGrid = ({
     selected,
     toggle,
 }: {
     selected: Set<string>;
     toggle: (sc: string) => void;
-}) => (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[400px] overflow-y-auto pr-2 p-2">
-        {LANGUAGE_OPTIONS.map(lang => {
-            const isSel = selected.has(lang.shortcut);
-            return (
-                <button
-                    key={lang.code}
-                    onClick={() => toggle(lang.shortcut)}
-                    className={`language-chip flex flex-col items-start px-3 py-2 rounded-lg border text-left transition-all
-            border-gray-700/50 bg-primary/50
-            ${isSel ? 'ring-2 ring-secondary border-secondary bg-secondary/10' : ''}
-          `}
-                    style={{
-                        boxShadow: isSel ? '0 0 0 2px #8B5CF6' : undefined,
-                        fontWeight: isSel ? 700 : 500,
-                    }}
-                >
-                    <span
-                        className={isSel ? 'text-secondary font-bold' : 'text-gray-300 font-bold'}
-                    >
-                        {lang.shortcut}
-                    </span>
-                    <span className="text-xs text-gray-400">{lang.name}</span>
-                </button>
-            );
-        })}
-    </div>
-);
+}) => {
+    const [expanded, setExpanded] = useState(false);
+
+    // Show only the first row (sm:grid-cols-3, so 3 per row on sm+ screens, 2 on mobile)
+    const perRow = typeof window !== 'undefined' && window.innerWidth >= 640 ? 3 : 2;
+    const visibleCount = expanded ? LANGUAGE_OPTIONS.length : perRow;
+
+    return (
+        <div>
+            <div
+                className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[400px] pr-2 p-2 overflow-y-scroll"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+                {/* Hide scrollbar for Chrome, Safari and Opera */}
+                <style jsx>{`
+                    div::-webkit-scrollbar {
+                        display: none;
+                    }
+                `}</style>
+                {LANGUAGE_OPTIONS.slice(0, visibleCount).map(lang => {
+                    const isSel = selected.has(lang.shortcut);
+                    return (
+                        <button
+                            key={lang.code}
+                            onClick={() => toggle(lang.shortcut)}
+                            className={`language-chip flex flex-col items-start px-3 py-2 rounded-lg border text-left transition-all
+                border-gray-700/50 bg-primary/50
+                ${
+                    isSel
+                        ? 'ring-2 ring-secondary border-secondary bg-secondary/10 bg-[#8B5CF6]/20'
+                        : ''
+                }
+              `}
+                            style={{
+                                boxShadow: isSel ? '0 0 0 1.5px #8B5CF6' : undefined,
+                                fontWeight: isSel ? 700 : 500,
+                            }}
+                        >
+                            <span
+                                className={`font-bold ${isSel ? 'tracking-wide' : ''}`}
+                                style={{
+                                    color: isSel ? '#8B5CF6' : '#d1d5db',
+                                    fontWeight: isSel ? 800 : 600,
+                                }}
+                            >
+                                {lang.shortcut}
+                            </span>
+                            <span className="text-xs text-gray-400">{lang.name}</span>
+                        </button>
+                    );
+                })}
+            </div>
+            <div className="flex flex-col items-end">
+                {!expanded && LANGUAGE_OPTIONS.length > visibleCount && (
+                    <div className="mt-4">
+                        <button
+                            className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#8B5CF6]/20 text-[#8B5CF6] font-medium hover:bg-[#221a3e] transition text-sm"
+                            onClick={() => setExpanded(true)}
+                        >
+                            <i className="fa-solid fa-chevron-down" /> Show more languages
+                        </button>
+                    </div>
+                )}
+                {expanded && LANGUAGE_OPTIONS.length > perRow && (
+                    <div className="mt-4">
+                        <button
+                            className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#8B5CF6]/20 text-[#8B5CF6] font-medium hover:bg-[#221a3e] transition text-sm"
+                            onClick={() => setExpanded(false)}
+                        >
+                            <i className="fa-solid fa-chevron-up" /> Show less
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
 
 const TranslateButton = ({ onClick, loading }: { onClick: () => void; loading: boolean }) => (
     <button
         onClick={onClick}
         disabled={loading}
         className="group relative inline-flex items-center justify-center
-      px-10 py-4 rounded-full font-semibold text-white shadow-lg
-      transition-transform"
+      px-10 py-4 rounded-lg font-semibold text-white shadow-lg
+      transition-transform w-full"
         style={{
             backgroundColor: '#8B5CF6',
             boxShadow: '0 2px 16px 0 #8B5CF633',
         }}
     >
         <span
-            className="absolute inset-0 rounded-full"
+            className="absolute inset-0 rounded-lg"
             style={{
                 background: 'linear-gradient(90deg, #8B5CF6 0%, #7C3AED 100%)',
                 opacity: 0.85,
