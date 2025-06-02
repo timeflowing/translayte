@@ -51,9 +51,6 @@ export default function TranslatorPage() {
 
     /* result */
     const [isTranslating, setIsTranslating] = useState(false);
-    const [jsonTranslations, setJsonTranslations] = useState<
-        Record<string, Record<string, string>>
-    >({});
 
     /* language selection info */
     const [langLimitInfo, setLangLimitInfo] = useState<string | null>(null);
@@ -112,7 +109,6 @@ export default function TranslatorPage() {
                         result[code][k] = t;
                     }
                 }
-                setJsonTranslations(result);
             }
 
             /* ---------- key/value mode ---------- */
@@ -126,7 +122,6 @@ export default function TranslatorPage() {
                         result[code][key] = t;
                     }
                 }
-                setJsonTranslations(result);
             }
         } catch (err) {
             console.error(err);
@@ -140,7 +135,6 @@ export default function TranslatorPage() {
         setSelectedShortcuts(new Set());
         setRows([{ key: '', value: '', context: '' }]);
         setJsonInput('');
-        setJsonTranslations({});
     };
 
     /* ---------------------------------------------------------------- ui */
