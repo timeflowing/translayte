@@ -2,7 +2,6 @@
 import React, { useRef, useState, ChangeEvent, useEffect } from 'react';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import { translateText } from '../utils/translator';
-import Image from 'next/image';
 
 /* ---------------------------------------------------------------- data */
 const LANGUAGE_OPTIONS = [
@@ -204,14 +203,6 @@ export default function TranslatorPage() {
                         {mode === 'keys' && <KeyTable rows={rows} setRows={setRows} />}
 
                         {/* toggles */}
-                        <div className="bg-[#191919]/70 backdrop-blur-sm rounded-lg p-4 mt-10 flex flex-col sm:flex-row sm:justify-between gap-4">
-                            <Toggle
-                                label="Keep keys order"
-                                checked={keepOrder}
-                                onChange={setKeepOrder}
-                            />
-                            <Toggle label="Minify output" checked={minify} onChange={setMinify} />
-                        </div>
 
                         {/* Language selection info */}
                     </section>
@@ -264,6 +255,14 @@ export default function TranslatorPage() {
                             )}
                         </div>
                         {/* buttons */}
+                        <div className="bg-[#191919]/70 backdrop-blur-sm rounded-lg p-4 mt-4 flex flex-col sm:flex-row sm:justify-between gap-4">
+                            <Toggle
+                                label="Keep keys order"
+                                checked={keepOrder}
+                                onChange={setKeepOrder}
+                            />
+                            <Toggle label="Minify output" checked={minify} onChange={setMinify} />
+                        </div>
                         <div className="flex flex-col sm:flex-row gap-4 mt-4">
                             <TranslateButton onClick={handleTranslate} loading={isTranslating} />
                             <button
