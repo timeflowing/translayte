@@ -44,6 +44,7 @@ const LandingPage = () => {
             y: Math.random() * canvas.height,
             vx: (Math.random() - 0.5) * 0.4,
             vy: (Math.random() - 0.5) * 0.4,
+            alpha: 1,
         }));
 
         /* ------------------------------ colours ------------------------- */
@@ -74,50 +75,56 @@ const LandingPage = () => {
             t += 0.003;
             const mix = Math.sin(t) * 0.5 + 0.5;
 
-            ctx.fillStyle = 'rgba(15,15,15,0.55)'; // translucent paint-over
+            ctx.fillStyle = 'rgba(15,15,15,0.55)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             /* move + draw nodes */
-            ctx.fillStyle = rgba(mix, 0.9);
             nodes.forEach((n, idx) => {
-                // Much slower, more subtle oscillation
                 const oscX = Math.sin(t * 0.15 + idx) * 0.045;
                 const oscY = Math.cos(t * 0.12 + idx) * 0.045;
 
-                n.x += oscX;
-                n.y += oscY;
+                n.x += oscX + n.vx;
+                n.y += oscY + n.vy;
 
-                // basic drift (optional, can be reduced for more "floaty" effect)
-                n.x += n.vx;
-                n.y += n.vy;
+                // --- wrap detection ---
+                const wrapped = n.x < 0 || n.x > canvas.width || n.y < 0 || n.y > canvas.height;
 
-                // --- wrap around edges for continuous field ---
+                // wrap-around
                 if (n.x < 0) n.x = canvas.width;
                 if (n.x > canvas.width) n.x = 0;
                 if (n.y < 0) n.y = canvas.height;
                 if (n.y > canvas.height) n.y = 0;
 
-                // mouse interaction (mild repulsion / attraction)
+                // if wrapped, reset alpha to 0
+                if (wrapped) {
+                    n.alpha = 0;
+                }
+
+                // gradual fade-in (max 1)
+                n.alpha = Math.min(1, (n.alpha ?? 1) + 0.01);
+
+                // --- mouse interaction ---
                 const dx = n.x - mouse.x;
                 const dy = n.y - mouse.y;
                 const md = Math.hypot(dx, dy);
-                if (md < 120) {
-                    const force = ((120 - md) / 120) * 0.05;
+                if (md < 80) {
+                    const force = ((120 - md) / 120) * 0.04;
                     n.vx += (dx / md) * force;
                     n.vy += (dy / md) * force;
                 }
 
-                // slow velocity damping so they don’t fly away
+                // damping
                 n.vx *= 0.98;
                 n.vy *= 0.98;
 
-                // node
+                // draw node with fade-in alpha
+                ctx.fillStyle = rgba(mix, 0.9 * (n.alpha ?? 1));
                 ctx.beginPath();
                 ctx.arc(n.x, n.y, 2, 0, Math.PI * 2);
                 ctx.fill();
             });
 
-            /* links */
+            /* draw links */
             ctx.lineWidth = 1;
             ctx.strokeStyle = rgba(mix, 0.35);
             for (let i = 0; i < nodes.length; i++) {
@@ -126,7 +133,10 @@ const LandingPage = () => {
                     const dy = nodes[i].y - nodes[j].y;
                     const d = dx * dx + dy * dy;
                     if (d < LINK_LIMIT * LINK_LIMIT) {
-                        ctx.globalAlpha = 1 - Math.sqrt(d) / LINK_LIMIT;
+                        ctx.globalAlpha =
+                            ((1 - Math.sqrt(d) / LINK_LIMIT) *
+                                ((nodes[i].alpha ?? 1) + (nodes[j].alpha ?? 1))) /
+                            2; // blend by alpha
                         ctx.beginPath();
                         ctx.moveTo(nodes[i].x, nodes[i].y);
                         ctx.lineTo(nodes[j].x, nodes[j].y);
@@ -134,6 +144,7 @@ const LandingPage = () => {
                     }
                 }
             }
+
             ctx.globalAlpha = 1;
         };
         loop();
@@ -177,13 +188,26 @@ const LandingPage = () => {
                             </span>
                         ))}
                     </nav>
-                    <span
-                        className="hidden md:inline-block px-6 py-2 rounded-full border border-[#a78bfa] text-white font-medium hover:bg-[#a78bfa]/10 transition-colors cursor-pointer"
-                        role="button"
-                        tabIndex={0}
-                    >
-                        Sign In
-                    </span>
+                    <div className="hidden md:flex items-center space-x-4">
+                        <span
+                            className="px-6 py-2 rounded-full border border-[#a78bfa] text-white font-medium hover:bg-[#a78bfa]/10 transition-colors cursor-pointer"
+                            role="button"
+                            tabIndex={0}
+                        >
+                            Sign In
+                        </span>
+                        <span
+                            className="px-6 py-2 rounded-full border border-[#8B5CF6] bg-[#8B5CF6]/80 text-white font-medium hover:bg-[#8B5CF6] hover:border-[#a78bfa] transition-colors cursor-pointer shadow-md"
+                            role="button"
+                            tabIndex={0}
+                            style={{
+                                boxShadow: '0 2px 16px 0 #8B5CF633',
+                                fontWeight: 600,
+                            }}
+                        >
+                            Sign Up
+                        </span>
+                    </div>
                     <button
                         className="md:hidden text-white"
                         onClick={() => setMobileMenuOpen(v => !v)}
@@ -457,9 +481,9 @@ const LandingPage = () => {
                         gradient
                         features={[
                             'Unlimited translations',
-                            'Unlimited languages',
-                            'Early access to new features',
+                            'History panel',
                             'Priority support',
+                            'Early access to new features',
                         ]}
                     />
                 </div>
@@ -599,13 +623,13 @@ const PricingCard: React.FC<PricingCardProps> = ({
     <div
         className={`relative rounded-2xl p-8 border flex flex-col ${
             gradient
-                ? 'bg-gradient-to-br from-[#8B5CF6]/20 to-[#8B5CF6]/10 border-[#8B5CF6]/50'
+                ? 'bg-[linear-gradient(to_bottom_right,_rgba(139,92,246,0.2),_rgba(167,139,250,0.1))] border border-[rgba(139,92,246,0.5)]'
                 : 'bg-[#0f0f0f] border-white/10'
         }`}
         style={{ minHeight: 420 }}
     >
         {popular && (
-            <div className="absolute -top-4 right-4 bg-[#8B5CF6] text-white text-xs font-bold px-3 py-1 rounded-full tracking-wide">
+            <div className="absolute -top-3 right-12 bg-[#8B5CF6] text-white text-xs font-bold px-3 py-1 rounded-full tracking-wide">
                 POPULAR
             </div>
         )}
@@ -626,7 +650,7 @@ const PricingCard: React.FC<PricingCardProps> = ({
             {features.map(f => (
                 <li key={f} className="flex items-start">
                     <i className="fa-solid fa-check text-green-500 mt-1 mr-2" />
-                    <span>{f}</span>
+                    <span className="font-semibold">{f}</span>
                 </li>
             ))}
         </ul>

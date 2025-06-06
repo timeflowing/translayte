@@ -1,34 +1,28 @@
 'use client';
 import React, { useRef, useState, ChangeEvent, useEffect } from 'react';
 import '@fortawesome/fontawesome-free/css/all.min.css';
+import '../translayte.css';
 import { translateText } from '../utils/translator';
-
 /* ---------------------------------------------------------------- data */
 const LANGUAGE_OPTIONS = [
-    { code: 'eng_Latn', name: 'English', shortcut: 'EN' },
-    { code: 'ces_Latn', name: 'Czech', shortcut: 'CS' },
-    { code: 'ita_Latn', name: 'Italian', shortcut: 'IT' },
-    { code: 'ben_Beng', name: 'Bengali', shortcut: 'BN' },
-    { code: 'nld_Latn', name: 'Dutch', shortcut: 'NL' },
-    { code: 'fra_Latn', name: 'French', shortcut: 'FR' },
-    { code: 'deu_Latn', name: 'German', shortcut: 'DE' },
-    { code: 'hin_Deva', name: 'Hindi', shortcut: 'HI' },
-    { code: 'jpn_Jpan', name: 'Japanese', shortcut: 'JA' },
-    { code: 'kor_Hang', name: 'Korean', shortcut: 'KO' },
-    { code: 'msa_Latn', name: 'Malay', shortcut: 'MS' },
-    { code: 'fas_Arab', name: 'Persian', shortcut: 'FA' },
-    { code: 'pol_Latn', name: 'Polish', shortcut: 'PL' },
-    { code: 'por_Latn', name: 'Portuguese', shortcut: 'PT' },
-    { code: 'spa_Latn', name: 'Spanish', shortcut: 'ES' },
-    { code: 'zho_Hans', name: 'Chinese (Simplified)', shortcut: 'ZH' },
-    { code: 'rus_Cyrl', name: 'Russian', shortcut: 'RU' },
-    { code: 'tur_Latn', name: 'Turkish', shortcut: 'TR' },
-    { code: 'ara_Arab', name: 'Arabic', shortcut: 'AR' },
-    { code: 'vie_Latn', name: 'Vietnamese', shortcut: 'VI' },
+    { code: 'en_XX', name: 'English', shortcut: 'EN' },
+    { code: 'cs_CZ', name: 'Czech', shortcut: 'CS' },
+    { code: 'it_IT', name: 'Italian', shortcut: 'IT' },
+    { code: 'fr_XX', name: 'French', shortcut: 'FR' },
+    { code: 'de_DE', name: 'German', shortcut: 'DE' },
+    { code: 'es_XX', name: 'Spanish', shortcut: 'ES' },
+    { code: 'ru_RU', name: 'Russian', shortcut: 'RU' },
+    { code: 'zh_CN', name: 'Chinese (Simplified)', shortcut: 'ZH' },
+    { code: 'ar_AR', name: 'Arabic', shortcut: 'AR' },
+    { code: 'hi_IN', name: 'Hindi', shortcut: 'HI' },
+    { code: 'pl_PL', name: 'Polish', shortcut: 'PL' },
+    { code: 'pt_XX', name: 'Portuguese', shortcut: 'PT' },
+    { code: 'tr_TR', name: 'Turkish', shortcut: 'TR' },
+    { code: 'vi_VN', name: 'Vietnamese', shortcut: 'VI' },
 ] as const;
 
 /* handy maps */
-const SHORTCUT_TO_CODE = Object.fromEntries(LANGUAGE_OPTIONS.map(l => [l.shortcut, l.code]));
+
 // const CODE_TO_SHORTCUT = Object.fromEntries(LANGUAGE_OPTIONS.map(l => [l.code, l.shortcut]));
 
 /* ---------------------------------------------------------------- page */
@@ -55,6 +49,12 @@ export default function TranslatorPage() {
     /* language selection info */
     const [langLimitInfo, setLangLimitInfo] = useState<string | null>(null);
 
+    /* translation result */
+    const [translationResult, setTranslationResult] = useState<Record<
+        string,
+        Record<string, string>
+    > | null>(null);
+
     /* ------------- helpers */
     const toggleLanguage = (shortcut: string) => {
         setSelectedShortcuts(prev => {
@@ -74,9 +74,12 @@ export default function TranslatorPage() {
         });
     };
 
+    const [fileName, setFileName] = useState<string | null>(null);
+
     const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+        setFileName(file.name); // <-- set file name
         const reader = new FileReader();
         reader.onload = () => {
             try {
@@ -90,42 +93,85 @@ export default function TranslatorPage() {
         reader.readAsText(file);
     };
 
+    function flattenJson(obj: any, prefix = '', res: Record<string, string> = {}) {
+        for (const key in obj) {
+            const val = obj[key];
+            const newKey = prefix ? `${prefix}.${key}` : key;
+            if (typeof val === 'string') {
+                res[newKey] = val;
+            } else if (typeof val === 'object' && val !== null) {
+                flattenJson(val, newKey, res);
+            }
+        }
+        return res;
+    }
     /* translate button */
+    function unflattenJson(flat: Record<string, string>) {
+        const result: any = {};
+        for (const flatKey in flat) {
+            const keys = flatKey.split('.');
+            let cur = result;
+            keys.forEach((k, i) => {
+                if (i === keys.length - 1) {
+                    cur[k] = flat[flatKey];
+                } else {
+                    cur[k] = cur[k] || {};
+                    cur = cur[k];
+                }
+            });
+        }
+        return result;
+    }
     const handleTranslate = async () => {
-        const targetCodes = [...selectedShortcuts].map(sc => SHORTCUT_TO_CODE[sc]!);
+        const targetCodes = LANGUAGE_OPTIONS.filter(l => selectedShortcuts.has(l.shortcut)).map(
+            l => l.code,
+        );
         if (targetCodes.length === 0) return;
 
         setIsTranslating(true);
         try {
+            let result: Record<string, Record<string, string>> = {};
+
             /* ---------- JSON mode ---------- */
             if (mode === 'file') {
                 const parsed = JSON.parse(jsonInput || '{}');
-                const result: Record<string, Record<string, string>> = {};
+                const flat = flattenJson(parsed);
                 for (const code of targetCodes) {
                     result[code] = {};
-                    for (const [k, v] of Object.entries(parsed)) {
-                        if (typeof v !== 'string') continue;
-                        const t = await translateText(v, code, 'eng_Latn');
-                        result[code][k] = t;
-                    }
+                    // Translate all flat string values
+                    const keys = Object.keys(flat);
+                    const translations = await Promise.all(
+                        keys.map(k => translateText(flat[k], code, 'en_XX')),
+                    );
+                    // Build a flat map for this language
+                    const flatTranslated: Record<string, string> = {};
+                    keys.forEach((k, idx) => {
+                        flatTranslated[k] = translations[idx];
+                    });
+                    // Unflatten to nested structure
+                    result[code] = flatTranslated;
                 }
             }
 
             /* ---------- key/value mode ---------- */
             if (mode === 'keys') {
                 const input = rows.filter(r => r.key && r.value);
-                const result: Record<string, Record<string, string>> = {};
                 for (const code of targetCodes) {
                     result[code] = {};
-                    for (const { key, value } of input) {
-                        const t = await translateText(value, code, 'eng_Latn');
-                        result[code][key] = t;
-                    }
+                    // Batch translation for all values in parallel for this language
+                    const translations = await Promise.all(
+                        input.map(({ value }) => translateText(value, code, 'en_XX')),
+                    );
+                    input.forEach(({ key }, idx) => {
+                        result[code][key] = translations[idx];
+                    });
                 }
             }
+
+            setTranslationResult(result); // <-- Save the result to state
         } catch (err) {
-            console.error(err);
-            alert('Translation failed');
+            console.error('[Translayte] Translation failed:', err);
+            alert('Translation failed. Please check your API token and try again.');
         } finally {
             setIsTranslating(false);
         }
@@ -136,7 +182,11 @@ export default function TranslatorPage() {
         setRows([{ key: '', value: '', context: '' }]);
         setJsonInput('');
     };
-
+    // translateText(
+    //     'Tohle je velmi dlouhý text, který zjištuje za jak dlouho to dokážeš přeskočit',
+    //     'en_XX',
+    //     'cs_CZ',
+    // );
     /* ---------------------------------------------------------------- ui */
     return (
         <>
@@ -161,7 +211,7 @@ export default function TranslatorPage() {
                         {/* -----  file mode  ----- */}
                         {mode === 'file' && (
                             <>
-                                <DropZone onSelect={handleFileUpload} />
+                                <DropZone onSelect={handleFileUpload} fileName={fileName} />
                                 {/* ─────────────────────────  JSON Editor  ───────────────────────── */}
                                 <div className="relative mt-6 w-full max-w-3xl mx-auto">
                                     {/* top bar */}
@@ -209,10 +259,7 @@ export default function TranslatorPage() {
                                 <h3 className="text-xl font-medium">Choose target languages</h3>
                                 <span className="text-base text-gray-200 font-semibold">
                                     <span style={{ color: '#a78bfa' }}> Selected </span>
-                                    <span
-                                        className="font-semibold"
-                                        style={{ color: '#a78bfa', fontSize: '1.1em' }}
-                                    >
+                                    <span className="font-semibold" style={{ color: '#a78bfa' }}>
                                         {selectedShortcuts.size}
                                     </span>{' '}
                                     / {LANGUAGE_OPTIONS.length}
@@ -267,6 +314,57 @@ export default function TranslatorPage() {
                                 <i className="fa-solid fa-rotate-left mr-2" />
                             </button>
                         </div>
+
+                        {/* ---------- Translation Result ---------- */}
+                        {translationResult && (
+                            <div className="mt-8">
+                                <h3 className="text-lg font-semibold mb-2 text-gray-200">
+                                    Translation Result
+                                </h3>
+                                <div className="overflow-x-auto bg-[#18103a]/80 border border-[#2d2250] rounded-2xl p-4 shadow-lg">
+                                    <table className="min-w-full text-sm">
+                                        <thead>
+                                            <tr>
+                                                <th className="text-left text-gray-400 pb-2 pr-4">
+                                                    Key
+                                                </th>
+                                                {Object.keys(translationResult).map(lang => (
+                                                    <th
+                                                        key={lang}
+                                                        className="text-left text-gray-400 pb-2 pr-4"
+                                                    >
+                                                        {LANGUAGE_OPTIONS.find(l => l.code === lang)
+                                                            ?.shortcut || lang}
+                                                    </th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {/* Show all keys from the first language */}
+                                            {Object.keys(
+                                                translationResult[
+                                                    Object.keys(translationResult)[0]
+                                                ] || {},
+                                            ).map(key => (
+                                                <tr key={key}>
+                                                    <td className="pr-4 py-1 font-mono text-gray-300">
+                                                        {key}
+                                                    </td>
+                                                    {Object.keys(translationResult).map(lang => (
+                                                        <td
+                                                            key={lang}
+                                                            className="pr-4 py-1 text-gray-100"
+                                                        >
+                                                            {translationResult[lang][key]}
+                                                        </td>
+                                                    ))}
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
                     </aside>
                 </div>
             </main>
@@ -293,6 +391,7 @@ const ModeSwitcher = ({
                         onClick={() => setMode(m)}
                         className={`flex items-center gap-2 justify-center flex-1 py-4 font-semibold text-base transition-colors
               ${active ? 'bg-[#22173d] text-white' : 'bg-[#0F0F0F] text-gray-200'}
+              cursor-pointer
             `}
                         style={{
                             borderLeft: idx === 1 ? '1px solid #151515' : undefined,
@@ -313,8 +412,9 @@ const ModeSwitcher = ({
 
 interface DZProps {
     onSelect: (e: ChangeEvent<HTMLInputElement>) => void;
+    fileName?: string | null;
 }
-const DropZone: React.FC<DZProps> = ({ onSelect }) => {
+const DropZone: React.FC<DZProps> = ({ onSelect, fileName }) => {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const [drag, setDrag] = useState(false);
     const dragRef = useRef(false);
@@ -470,8 +570,12 @@ const DropZone: React.FC<DZProps> = ({ onSelect }) => {
                 }
             }}
             htmlFor="file-upload"
-            className={`relative flex flex-col items-center justify-center h-60 mb-8  border-dashed rounded-xl cursor-pointer overflow-hidden transition-colors duration-200 ${
-                drag ? 'border-[#8B5CF6] bg-[#1a1333]/80' : 'border-[#8B5CF633] bg-transparent'
+            className={`relative flex flex-col items-center justify-center h-60 mb-8 border-dashed rounded-xl cursor-pointer overflow-hidden transition-colors duration-200 ${
+                drag
+                    ? 'border-[#8B5CF6] bg-[#1a1333]/80'
+                    : fileName
+                    ? 'border-[#a78bfa] bg-[#a78bfa]/20'
+                    : 'border-[#8B5CF633] bg-transparent'
             }`}
             style={
                 {
@@ -488,19 +592,44 @@ const DropZone: React.FC<DZProps> = ({ onSelect }) => {
             {/* Content always above the canvas */}
             <div className="relative z-10 flex flex-col items-center text-center px-4 pointer-events-none select-none">
                 <i
-                    className="fa-solid fa-cloud-arrow-up text-4xl mb-4"
-                    style={{ color: '#8B5CF6' }}
+                    className={`fa-solid ${
+                        fileName ? 'fa-file-circle-check' : 'fa-cloud-arrow-up'
+                    } text-4xl mb-4`}
+                    style={{ color: fileName ? '#a78bfa' : '#8B5CF6' }}
                 />
-
-                <p className="text-lg font-semibold">Drop your JSON file here</p>
-                <p className="text-gray-400 text-sm">or click to browse</p>
-                <span
-                    className="mt-4 relative inline-flex items-center justify-center px-6 py-2
-               bg-[#8B5CF6]/20 rounded-lg font-bold text-base border"
-                    style={{ color: '#8B5CF6', borderColor: '#a78bfa', borderWidth: 1 }}
-                >
-                    Browse files
-                </span>
+                {fileName ? (
+                    <>
+                        <p className="text-lg font-semibold" style={{ color: '#a78bfa' }}>
+                            File loaded!
+                        </p>
+                        <p className="text-sm mt-1" style={{ color: '#a78bfa' }}>
+                            {fileName}
+                        </p>
+                        <span
+                            className="mt-4 relative inline-flex items-center justify-center px-6 py-2
+                        rounded-lg font-bold text-base border"
+                            style={{
+                                color: '#fff',
+                                background: '#a78bfa',
+                                borderColor: '#a78bfa',
+                            }}
+                        >
+                            Change file
+                        </span>
+                    </>
+                ) : (
+                    <>
+                        <p className="text-lg font-semibold">Drop your JSON file here</p>
+                        <p className="text-gray-400 text-sm">or click to browse</p>
+                        <span
+                            className="mt-4 relative inline-flex items-center justify-center px-6 py-2
+                        bg-[#8B5CF6]/50 rounded-lg font-bold text-base border"
+                            style={{ color: '#8B5CF6', borderColor: '#a78bfa', borderWidth: 1 }}
+                        >
+                            Browse files
+                        </span>
+                    </>
+                )}
             </div>
             <input
                 id="file-upload"
@@ -562,7 +691,7 @@ const KeyTable = ({
                                 {rows.length > 1 && (
                                     <button
                                         onClick={() => removeRow(i)}
-                                        className="text-gray-500 hover:text-red-500"
+                                        className="text-gray-500 hover:text-red-500 cursor-pointer"
                                         title="Remove row"
                                     >
                                         <i className="fa-solid fa-xmark" />
@@ -577,7 +706,7 @@ const KeyTable = ({
             <div className="flex justify-end mt-6">
                 <button
                     onClick={addRow}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-secondary to-accent text-white font-semibold shadow-lg hover:opacity-90 transition"
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-secondary to-accent text-white font-semibold shadow-lg hover:opacity-90 transition cursor-pointer"
                 >
                     <i className="fa-solid fa-plus" /> Add new key
                 </button>
@@ -593,9 +722,13 @@ const LanguageGrid = ({
     toggle: (sc: string) => void;
 }) => {
     const [expanded, setExpanded] = useState(false);
+    const [perRow, setPerRow] = useState(2);
 
-    // Show only the first row (sm:grid-cols-3, so 3 per row on sm+ screens, 2 on mobile)
-    const perRow = typeof window !== 'undefined' && window.innerWidth >= 640 ? 3 : 2;
+    useEffect(() => {
+        if (window.innerWidth >= 640) setPerRow(3);
+        else setPerRow(2);
+    }, []);
+
     const visibleCount = expanded ? LANGUAGE_OPTIONS.length : perRow;
 
     return (
@@ -623,6 +756,7 @@ const LanguageGrid = ({
                         ? 'ring-2 ring-secondary border-secondary bg-secondary/10 bg-[#8B5CF6]/20'
                         : ''
                 }
+                cursor-pointer
               `}
                             style={{
                                 boxShadow: isSel ? '0 0 0 1.5px #8B5CF6' : undefined,
@@ -647,7 +781,7 @@ const LanguageGrid = ({
                 {!expanded && LANGUAGE_OPTIONS.length > visibleCount && (
                     <div className="mt-4">
                         <button
-                            className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#8B5CF6]/20 text-[#8B5CF6] font-medium hover:bg-[#221a3e] transition text-sm"
+                            className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#8B5CF6]/20 text-[#8B5CF6] font-medium hover:bg-[#221a3e] transition text-sm cursor-pointer"
                             onClick={() => setExpanded(true)}
                         >
                             <i className="fa-solid fa-chevron-down" /> Show more languages
@@ -657,7 +791,7 @@ const LanguageGrid = ({
                 {expanded && LANGUAGE_OPTIONS.length > perRow && (
                     <div className="mt-4">
                         <button
-                            className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#8B5CF6]/20 text-[#8B5CF6] font-medium hover:bg-[#221a3e] transition text-sm"
+                            className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#8B5CF6]/20 text-[#8B5CF6] font-medium hover:bg-[#221a3e] transition text-sm cursor-pointer"
                             onClick={() => setExpanded(false)}
                         >
                             <i className="fa-solid fa-chevron-up" /> Show less
@@ -673,22 +807,9 @@ const TranslateButton = ({ onClick, loading }: { onClick: () => void; loading: b
     <button
         onClick={onClick}
         disabled={loading}
-        className="group relative inline-flex items-center justify-center
-      px-10 py-4 rounded-lg font-semibold text-white shadow-lg
-      transition-transform w-full"
-        style={{
-            backgroundColor: '#8B5CF6',
-            boxShadow: '0 2px 16px 0 #8B5CF633',
-        }}
+        className="btn-primary w-full group relative inline-flex items-center justify-center"
     >
-        <span
-            className="absolute inset-0 rounded-lg"
-            style={{
-                background: 'linear-gradient(90deg, #8B5CF6 0%, #7C3AED 100%)',
-                opacity: 0.85,
-                filter: 'blur(8px)',
-            }}
-        />
+        <span className="absolute inset-0 rounded-lg" />
         <span className="relative z-10">
             {loading ? (
                 <>
