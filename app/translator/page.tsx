@@ -49,9 +49,10 @@ export default function TranslatorPage() {
     const [fileName, setFileName] = useState<string | null>(null);
 
     /* ---------- translation result (⚠️ FLAT) ---------- */
-    const [translationResult, setTranslationResult] =
-        useState<Record<string, /* lang */ Record<string, string /* flat key -> value */>>>(null);
-
+    const [translationResult, setTranslationResult] = useState<Record<
+        string,
+        Record<string, string>
+    > | null>(null);
     /* ------------- helpers */
     const toggleLanguage = (shortcut: string) => {
         setSelectedShortcuts(prev => {
@@ -87,28 +88,28 @@ export default function TranslatorPage() {
         };
         reader.readAsText(file);
     };
+    type JsonValue = string | { [key: string]: JsonValue };
 
-    /* ---------- flatten / unflatten helpers ---------- */
-    function flattenJson(obj: any, prefix = '', res: Record<string, string> = {}) {
+    function flattenJson(
+        obj: JsonValue,
+        prefix = '',
+        res: Record<string, string> = {},
+    ): Record<string, string> {
+        if (typeof obj !== 'object' || obj === null) {
+            return res;
+        }
+
         for (const key in obj) {
             const val = obj[key];
             const newKey = prefix ? `${prefix}.${key}` : key;
-            if (typeof val === 'string') res[newKey] = val;
-            else if (val && typeof val === 'object') flattenJson(val, newKey, res);
+            if (typeof val === 'string') {
+                res[newKey] = val;
+            } else {
+                flattenJson(val, newKey, res);
+            }
         }
+
         return res;
-    }
-    function unflattenJson(flat: Record<string, string>) {
-        const out: any = {};
-        for (const flatKey in flat) {
-            const path = flatKey.split('.');
-            let cur = out;
-            path.forEach((seg, idx) => {
-                if (idx === path.length - 1) cur[seg] = flat[flatKey];
-                else cur = cur[seg] ?? (cur[seg] = {});
-            });
-        }
-        return out;
     }
 
     /* ---------------- translate ---------------- */
@@ -165,12 +166,12 @@ export default function TranslatorPage() {
         }
     };
 
-    const handleReset = () => {
-        setSelectedShortcuts(new Set());
-        setRows([{ key: '', value: '', context: '' }]);
-        setJsonInput('');
-        setTranslationResult(null);
-    };
+    // const handleReset = () => {
+    //     setSelectedShortcuts(new Set());
+    //     setRows([{ key: '', value: '', context: '' }]);
+    //     setJsonInput('');
+    //     setTranslationResult(null);
+    // };
     return (
         <>
             {/* background layer */}
