@@ -15,7 +15,74 @@ import Link from 'next/link';
  *      npm i tailwindcss vanta three @fortawesome/fontawesome-free                      *
  *      <LandingPage />                                                                   *
  *****************************************************************************************/
-
+const NAV_LINKS = [
+    { label: 'How It Works', href: '#how-it-works' },
+    { label: 'Benefits', href: '#benefits' },
+    { label: 'Features', href: '#features' },
+    { label: 'Pricing', href: '#pricing' },
+] as const;
+const translations = {
+    es: {
+        'WelcomeScreen.greeting': 'Hola, ¿qué tal?',
+        'WelcomeScreen.title': 'Bienvenido a Translayte',
+        'Navigation.home': 'Panel principal',
+        'Navigation.about': 'Sobre nuestro equipo',
+        'Navigation.contact': 'Soporte de contacto',
+        'Buttons.submit': 'Enviar formulario',
+        'Buttons.cancel': 'Cancelar acción',
+        'Forms.email': 'Campo de correo',
+        'Forms.password': 'Contraseña segura',
+        'Notification.saved': 'Cambios guardados con éxito',
+    },
+    fr: {
+        'WelcomeScreen.greeting': 'Salut, ça va ?',
+        'WelcomeScreen.title': 'Bienvenue sur Translayte',
+        'Navigation.home': 'Tableau de bord',
+        'Navigation.about': "À propos de l'équipe",
+        'Navigation.contact': 'Contacter le support',
+        'Buttons.submit': 'Envoyer le formulaire',
+        'Buttons.cancel': 'Annuler',
+        'Forms.email': 'Adresse e-mail',
+        'Forms.password': 'Mot de passe sécurisé',
+        'Notification.saved': 'Modifications enregistrées',
+    },
+    de: {
+        'WelcomeScreen.greeting': 'Hallo, wie geht’s?',
+        'WelcomeScreen.title': 'Willkommen bei Translayte',
+        'Navigation.home': 'Startseite',
+        'Navigation.about': 'Über unser Team',
+        'Navigation.contact': 'Support kontaktieren',
+        'Buttons.submit': 'Formular absenden',
+        'Buttons.cancel': 'Abbrechen',
+        'Forms.email': 'E-Mail-Feld',
+        'Forms.password': 'Sicheres Passwort',
+        'Notification.saved': 'Änderungen gespeichert',
+    },
+    it: {
+        'WelcomeScreen.greeting': 'Ciao, come va?',
+        'WelcomeScreen.title': 'Benvenuto su Translayte',
+        'Navigation.home': 'Dashboard',
+        'Navigation.about': 'Il nostro team',
+        'Navigation.contact': 'Contatta il supporto',
+        'Buttons.submit': 'Invia modulo',
+        'Buttons.cancel': 'Annulla',
+        'Forms.email': 'Campo email',
+        'Forms.password': 'Password sicura',
+        'Notification.saved': 'Modifiche salvate',
+    },
+    pt: {
+        'WelcomeScreen.greeting': 'Olá, tudo bem?',
+        'WelcomeScreen.title': 'Bem-vindo ao Translayte',
+        'Navigation.home': 'Painel principal',
+        'Navigation.about': 'Sobre nossa equipe',
+        'Navigation.contact': 'Contato de suporte',
+        'Buttons.submit': 'Enviar formulário',
+        'Buttons.cancel': 'Cancelar',
+        'Forms.email': 'Campo de e-mail',
+        'Forms.password': 'Senha segura',
+        'Notification.saved': 'Alterações salvas',
+    },
+};
 const LandingPage = () => {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -166,6 +233,12 @@ const LandingPage = () => {
         return () => window.removeEventListener('resize', close);
     }, []);
 
+    const [selectedLang, setSelectedLang] = useState<'es' | 'fr' | 'de' | 'it' | 'pt'>('es');
+
+    const handleLangClick = React.useCallback(
+        (code: typeof selectedLang) => setSelectedLang(code),
+        [],
+    );
     return (
         <>
             {/* Vanta target */}
@@ -179,34 +252,39 @@ const LandingPage = () => {
                 <div className="container mx-auto px-4 py-4 flex justify-between items-center">
                     <div className="text-xl font-bold gradient-text">Translayte</div>
                     <nav className="hidden md:flex space-x-8">
-                        {['How It Works', 'Benefits', 'Features', 'Pricing'].map(item => (
-                            <span
-                                key={item}
-                                className="text-gray-300 hover:text-white transition-colors cursor-pointer"
+                        {NAV_LINKS.map(({ label, href }) => (
+                            <a
+                                key={href}
+                                href={href}
+                                className="text-gray-300 hover:text-white transition-colors"
                             >
-                                {item}
-                            </span>
+                                {label}
+                            </a>
                         ))}
                     </nav>
                     <div className="hidden md:flex items-center space-x-4">
-                        <span
-                            className="px-6 py-2 rounded-full border border-[#a78bfa] text-white font-medium hover:bg-[#a78bfa]/10 transition-colors cursor-pointer"
-                            role="button"
-                            tabIndex={0}
-                        >
-                            Sign In
-                        </span>
-                        <span
-                            className="px-6 py-2 rounded-full border border-[#8B5CF6] bg-[#8B5CF6]/80 text-white font-medium hover:bg-[#8B5CF6] hover:border-[#a78bfa] transition-colors cursor-pointer shadow-md"
-                            role="button"
-                            tabIndex={0}
-                            style={{
-                                boxShadow: '0 2px 16px 0 #8B5CF633',
-                                fontWeight: 600,
-                            }}
-                        >
-                            Sign Up
-                        </span>
+                        <Link href="/login">
+                            <span
+                                className="px-6 py-2 rounded-full border border-[#a78bfa] text-white font-medium hover:bg-[#a78bfa]/10 transition-colors cursor-pointer"
+                                role="button"
+                                tabIndex={0}
+                            >
+                                Sign In
+                            </span>
+                        </Link>
+                        <Link href="/signup">
+                            <span
+                                className="px-6 py-2 rounded-full border border-[#8B5CF6] bg-[#8B5CF6]/80 text-white font-medium hover:bg-[#8B5CF6] hover:border-[#a78bfa] transition-colors cursor-pointer shadow-md"
+                                role="button"
+                                tabIndex={0}
+                                style={{
+                                    boxShadow: '0 2px 16px 0 #8B5CF633',
+                                    fontWeight: 600,
+                                }}
+                            >
+                                Sign Up
+                            </span>
+                        </Link>
                     </div>
                     <button
                         className="md:hidden text-white"
@@ -220,23 +298,25 @@ const LandingPage = () => {
                 {mobileMenuOpen && (
                     <div className="md:hidden bg-[#18181b] border-t border-gray-800 px-4 py-6">
                         <nav className="flex flex-col space-y-4">
-                            {['How It Works', 'Benefits', 'Features', 'Pricing'].map(item => (
-                                <span
-                                    key={item}
-                                    className="text-gray-300 hover:text-white transition-colors cursor-pointer text-lg"
+                            {NAV_LINKS.map(({ label, href }) => (
+                                <a
+                                    key={href}
+                                    href={href}
                                     onClick={() => setMobileMenuOpen(false)}
+                                    className="text-gray-300 hover:text-white transition-colors text-lg"
                                 >
-                                    {item}
-                                </span>
+                                    {label}
+                                </a>
                             ))}
-                            <span
-                                className="mt-4 px-6 py-2 rounded-full border border-[#a78bfa] text-white font-medium hover:bg-[#a78bfa]/10 transition-colors cursor-pointer text-center"
-                                role="button"
-                                tabIndex={0}
+
+                            {/* Sign-in button keeps its behaviour */}
+                            <Link
+                                href="/login"
+                                className="mt-4 px-6 py-2 rounded-full border border-[#a78bfa] text-white font-medium hover:bg-[#a78bfa]/10 text-center"
                                 onClick={() => setMobileMenuOpen(false)}
                             >
                                 Sign In
-                            </span>
+                            </Link>
                         </nav>
                     </div>
                 )}
@@ -244,7 +324,7 @@ const LandingPage = () => {
 
             {/* ------------------------------ Hero ---------------------------- */}
             <section id="hero" className="container mx-auto px-4 pt-24 text-center">
-                <div className="max-w-4xl mx-auto mt-24">
+                <div className="mx-auto mt-24 max-w-7xl lg:max-w-screen-xl">
                     <h1 className="text-4xl md:text-6xl font-bold mb-6">
                         Translate JSON files. <span className="gradient-text">Instantly.</span>
                     </h1>
@@ -263,10 +343,13 @@ const LandingPage = () => {
                             </button>
                         </Link>
                     </div>
-
                     {/* ---------------- Translation preview window ---------------- */}
-                    {/* (verbatim HTML → JSX; keys shortened for brevity) */}
-                    <div className="mt-10 mb-20 bg-[#18181b]/70 rounded-xl border border-white/10 shadow-2xl w-full max-w-5xl mx-auto p-2 sm:p-6 overflow-x-auto backdrop-blur-md backdrop-saturate-150">
+
+                    <div
+                        className="mt-10 mb-20 bg-[#18181b]/70 rounded-xl border border-white/10 shadow-2xl
+            w-full max-w-none px-0 p-2 sm:p-6 overflow-x-auto
+            backdrop-blur-md backdrop-saturate-150"
+                    >
                         {/* Window top bar */}
                         <div className="flex items-center space-x-2 mb-4">
                             <div className="w-3 h-3 rounded-full bg-red-500"></div>
@@ -281,10 +364,10 @@ const LandingPage = () => {
                             <CodeBlock
                                 title="Original (English)"
                                 badge="EN"
-                                badgeColor="blue"
+                                badgeColor="purple"
                                 content={{
-                                    'WelcomeScreen.title': 'Welcome to Translayte',
                                     'WelcomeScreen.greeting': 'Hello there,',
+                                    'WelcomeScreen.title': 'Welcome to Translayte',
                                     'Navigation.home': 'Home Dashboard',
                                     'Navigation.about': 'About Our Team',
                                     'Navigation.contact': 'Contact Support',
@@ -294,46 +377,34 @@ const LandingPage = () => {
                                     'Forms.password': 'Secure password',
                                     'Notification.saved': 'Changes saved successfully',
                                 }}
-                                valueColor="text-green-400"
+                                valueColor="text-purple-300"
                             />
 
                             {/* Translated block (ES) */}
                             <CodeBlock
-                                title="Translated (Spanish)"
-                                badge="ES"
+                                title={`Translated (${selectedLang.toUpperCase()})`}
+                                badge={selectedLang.toUpperCase()}
                                 badgeColor="green"
-                                content={{
-                                    'WelcomeScreen.title': 'Bienvenido a Translayte',
-                                    'WelcomeScreen.greeting': 'Hola, ¿qué tal?',
-                                    'Navigation.home': 'Panel principal',
-                                    'Navigation.about': 'Sobre nuestro equipo',
-                                    'Navigation.contact': 'Soporte de contacto',
-                                    'Buttons.submit': 'Enviar formulario',
-                                    'Buttons.cancel': 'Cancelar acción',
-                                    'Forms.email': 'Campo de correo',
-                                    'Forms.password': 'Contraseña segura',
-                                    'Notification.saved': 'Cambios guardados con éxito',
-                                }}
-                                valueColor="text-purple-300"
+                                content={translations[selectedLang]}
+                                valueColor="text-green-400"
                             />
                         </div>
                         {/* language pills */}
                         <div className="mt-8 flex justify-center">
                             <div className="flex flex-wrap items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-black/50 backdrop-blur-md text-sm text-gray-300 font-medium">
                                 <span>Also translating to:</span>
-                                {[
-                                    { code: 'fr', color: 'blue' },
-                                    { code: 'de', color: 'yellow' },
-                                    { code: 'it', color: 'red' },
-                                    { code: 'pt', color: 'purple' },
-                                    { code: '+26 more', color: 'gray' },
-                                ].map(({ code }) => (
-                                    <span
+                                {(['fr', 'de', 'it', 'pt'] as const).map(code => (
+                                    <button
                                         key={code}
-                                        className="select-none px-2 py-1 bg-gray-500/30 text-gray-300 rounded text-xs font-mono border border-gray-500/50"
+                                        className={`px-2 py-1 rounded text-xs font-mono border ${
+                                            selectedLang === code
+                                                ? 'bg-[#8B5CF6]/70 border-[#8B5CF6] text-white'
+                                                : 'bg-gray-500/30 border-gray-500/50 text-gray-300 hover:bg-gray-500/50'
+                                        } transition-colors`}
+                                        onClick={() => handleLangClick(code)}
                                     >
                                         {code}
-                                    </span>
+                                    </button>
                                 ))}
                             </div>
                         </div>
@@ -524,7 +595,7 @@ const LandingPage = () => {
 type CodeBlockProps = {
     title: string;
     badge: string;
-    badgeColor: 'green' | 'blue';
+    badgeColor: 'green' | 'purple';
     content: Record<string, string>;
     valueColor: string;
 };
@@ -538,21 +609,23 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ title, badge, badgeColor, content
                     {badge}
                 </span>
             )}
-            {badgeColor === 'blue' && (
-                <span className="px-2 py-1 bg-blue-500/30 text-blue-300 rounded text-xs font-mono border border-blue-500/50">
+
+            {badgeColor === 'purple' /* new variant */ && (
+                <span className="px-2 py-1 bg-[#8B5CF6]/20 text-purple-300 rounded text-xs font-mono border border-purple-500/50">
                     {badge}
                 </span>
             )}
         </div>
-        <pre className="space-y-1 text-sm font-mono overflow-x-auto">
+        <pre className="space-y-1 text-sm font-mono md:whitespace-pre xl:whitespace-pre-wrap break-words overflow-x-hidden">
             <code className="text-gray-400 text-left block">{'{'}</code>
-            {Object.entries(content).map(([k, v]) => (
-                <div key={k} className="pl-4 flex flex-nowrap w-full max-sm:flex-wrap">
+            {Object.entries(content).map(([k, v], i, arr) => (
+                <div key={k} className="pl-4 flex flex-wrap w-full">
                     <span className="text-orange-400 break-normal max-sm:break-all">
                         &quot;{k}&quot;:
                     </span>
                     <span className={`${valueColor} ml-2 break-normal max-sm:break-all`}>
                         &quot;{v}&quot;
+                        {i < arr.length - 1 && ','} {/* ← comma unless last line */}
                     </span>
                 </div>
             ))}
@@ -569,7 +642,16 @@ type SectionProps = {
 };
 
 const Section: React.FC<SectionProps> = ({ id, title, children, dark = false }) => (
-    <section id={id} className={`py-20 ${dark ? 'bg-[#0f0f0f]' : ''}`}>
+    <section
+        id={id}
+        className={`
+      ${dark ? 'bg-[#0f0f0f]' : ''}
+      py-16        
+      md:py-24     
+      lg:py-32     
+      scroll-mt-24 
+    `}
+    >
         <div className="container mx-auto px-4">
             {title && <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">{title}</h2>}
             {children}

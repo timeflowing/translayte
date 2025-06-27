@@ -2,7 +2,9 @@
 import React, { useRef, useState, ChangeEvent, useEffect } from 'react';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import '../translayte.css';
-import { translateText } from '../utils/translator';
+import { translateBatch } from '../utils/translator';
+import TranslationPreview from '../components/TranslationPreview';
+
 /* ---------------------------------------------------------------- data */
 const LANGUAGE_OPTIONS = [
     { code: 'en_XX', name: 'English', shortcut: 'EN' },
@@ -21,39 +23,34 @@ const LANGUAGE_OPTIONS = [
     { code: 'vi_VN', name: 'Vietnamese', shortcut: 'VI' },
 ] as const;
 
-/* handy maps */
-
-// const CODE_TO_SHORTCUT = Object.fromEntries(LANGUAGE_OPTIONS.map(l => [l.code, l.shortcut]));
-
 /* ---------------------------------------------------------------- page */
 export default function TranslatorPage() {
     /* ---------------- state */
+
     const [selectedShortcuts, setSelectedShortcuts] = useState<Set<string>>(
         new Set(['EN', 'IT', 'CS']),
     );
     const [mode, setMode] = useState<'file' | 'keys'>('file');
     const [keepOrder, setKeepOrder] = useState(true);
     const [minify, setMinify] = useState(false);
-
+    const [lastPayload, setLastPayload] = useState<Record<string, string> | null>(null);
+    const [lastTargetCodes, setLastTargetCodes] = useState<string[]>([]);
     /* key-value mode */
     const [rows, setRows] = useState<{ key: string; value: string; context?: string }[]>([
         { key: '', value: '', context: '' },
     ]);
 
-    /* file / json mode */
+    /* JSON-file mode */
     const [jsonInput, setJsonInput] = useState('');
 
-    /* result */
+    /* misc */
     const [isTranslating, setIsTranslating] = useState(false);
-
-    /* language selection info */
     const [langLimitInfo, setLangLimitInfo] = useState<string | null>(null);
+    const [fileName, setFileName] = useState<string | null>(null);
 
-    /* translation result */
-    const [translationResult, setTranslationResult] = useState<Record<
-        string,
-        Record<string, string>
-    > | null>(null);
+    /* ---------- translation result (⚠️ FLAT) ---------- */
+    const [translationResult, setTranslationResult] =
+        useState<Record<string, /* lang */ Record<string, string /* flat key -> value */>>>(null);
 
     /* ------------- helpers */
     const toggleLanguage = (shortcut: string) => {
@@ -61,31 +58,29 @@ export default function TranslatorPage() {
             const next = new Set(prev);
             if (next.has(shortcut)) {
                 next.delete(shortcut);
-                setLangLimitInfo(null); // clear info on deselect
+                setLangLimitInfo(null);
             } else {
                 if (next.size >= 2) {
                     setLangLimitInfo('Upgrade to Pro to select more than 2 languages.');
-                    return prev; // Prevent selecting more than 2
+                    return prev;
                 }
                 next.add(shortcut);
-                setLangLimitInfo(null); // clear info on select
+                setLangLimitInfo(null);
             }
             return next;
         });
     };
 
-    const [fileName, setFileName] = useState<string | null>(null);
-
     const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        setFileName(file.name); // <-- set file name
+        setFileName(file.name);
         const reader = new FileReader();
         reader.onload = () => {
             try {
                 const json = JSON.parse(reader.result as string);
                 setJsonInput(JSON.stringify(json, null, 2));
-                setMode('file'); // ensure correct mode
+                setMode('file');
             } catch {
                 alert('Invalid JSON file');
             }
@@ -93,85 +88,78 @@ export default function TranslatorPage() {
         reader.readAsText(file);
     };
 
+    /* ---------- flatten / unflatten helpers ---------- */
     function flattenJson(obj: any, prefix = '', res: Record<string, string> = {}) {
         for (const key in obj) {
             const val = obj[key];
             const newKey = prefix ? `${prefix}.${key}` : key;
-            if (typeof val === 'string') {
-                res[newKey] = val;
-            } else if (typeof val === 'object' && val !== null) {
-                flattenJson(val, newKey, res);
-            }
+            if (typeof val === 'string') res[newKey] = val;
+            else if (val && typeof val === 'object') flattenJson(val, newKey, res);
         }
         return res;
     }
-    /* translate button */
     function unflattenJson(flat: Record<string, string>) {
-        const result: any = {};
+        const out: any = {};
         for (const flatKey in flat) {
-            const keys = flatKey.split('.');
-            let cur = result;
-            keys.forEach((k, i) => {
-                if (i === keys.length - 1) {
-                    cur[k] = flat[flatKey];
-                } else {
-                    cur[k] = cur[k] || {};
-                    cur = cur[k];
-                }
+            const path = flatKey.split('.');
+            let cur = out;
+            path.forEach((seg, idx) => {
+                if (idx === path.length - 1) cur[seg] = flat[flatKey];
+                else cur = cur[seg] ?? (cur[seg] = {});
             });
         }
-        return result;
+        return out;
     }
+
+    /* ---------------- translate ---------------- */
     const handleTranslate = async () => {
         const targetCodes = LANGUAGE_OPTIONS.filter(l => selectedShortcuts.has(l.shortcut)).map(
             l => l.code,
         );
         if (targetCodes.length === 0) return;
 
+        /* ---- build payload ---- */
+        const payload =
+            mode === 'file'
+                ? (() => {
+                      try {
+                          return flattenJson(JSON.parse(jsonInput || '{}'));
+                      } catch {
+                          alert('❌ Invalid JSON payload');
+                          return null;
+                      }
+                  })()
+                : (() => {
+                      const kv = Object.fromEntries(
+                          rows.filter(r => r.key && r.value).map(r => [r.key, r.value]),
+                      );
+                      return Object.keys(kv).length ? kv : null;
+                  })();
+
+        if (!payload) return;
+
         setIsTranslating(true);
         try {
-            let result: Record<string, Record<string, string>> = {};
+            const translationsArr = await Promise.all(
+                targetCodes.map(async code => {
+                    try {
+                        const data = await translateBatch(payload, code, 'en_XX');
 
-            /* ---------- JSON mode ---------- */
-            if (mode === 'file') {
-                const parsed = JSON.parse(jsonInput || '{}');
-                const flat = flattenJson(parsed);
-                for (const code of targetCodes) {
-                    result[code] = {};
-                    // Translate all flat string values
-                    const keys = Object.keys(flat);
-                    const translations = await Promise.all(
-                        keys.map(k => translateText(flat[k], code, 'en_XX')),
-                    );
-                    // Build a flat map for this language
-                    const flatTranslated: Record<string, string> = {};
-                    keys.forEach((k, idx) => {
-                        flatTranslated[k] = translations[idx];
-                    });
-                    // Unflatten to nested structure
-                    result[code] = flatTranslated;
-                }
-            }
+                        /* ▼ flatten the nested object we get back from the server          */
+                        const flatData = flattenJson(data);
 
-            /* ---------- key/value mode ---------- */
-            if (mode === 'keys') {
-                const input = rows.filter(r => r.key && r.value);
-                for (const code of targetCodes) {
-                    result[code] = {};
-                    // Batch translation for all values in parallel for this language
-                    const translations = await Promise.all(
-                        input.map(({ value }) => translateText(value, code, 'en_XX')),
-                    );
-                    input.forEach(({ key }, idx) => {
-                        result[code][key] = translations[idx];
-                    });
-                }
-            }
-
-            setTranslationResult(result); // <-- Save the result to state
-        } catch (err) {
-            console.error('[Translayte] Translation failed:', err);
-            alert('Translation failed. Please check your API token and try again.');
+                        return [code, flatData] as const;
+                    } catch (e) {
+                        console.error(`[Translayte] ${code} failed:`, e);
+                        return [code, {}] as const;
+                    }
+                }),
+            );
+            setLastPayload(payload); // 🔹 save EN side for preview
+            setLastTargetCodes(targetCodes); // 🔹 save target list
+            setTranslationResult(Object.fromEntries(translationsArr));
+        } catch (e) {
+            console.error('[Translayte] Unexpected failure:', e);
         } finally {
             setIsTranslating(false);
         }
@@ -181,13 +169,8 @@ export default function TranslatorPage() {
         setSelectedShortcuts(new Set());
         setRows([{ key: '', value: '', context: '' }]);
         setJsonInput('');
+        setTranslationResult(null);
     };
-    // translateText(
-    //     'Tohle je velmi dlouhý text, který zjištuje za jak dlouho to dokážeš přeskočit',
-    //     'en_XX',
-    //     'cs_CZ',
-    // );
-    /* ---------------------------------------------------------------- ui */
     return (
         <>
             {/* background layer */}
@@ -212,14 +195,14 @@ export default function TranslatorPage() {
                         {mode === 'file' && (
                             <>
                                 <DropZone onSelect={handleFileUpload} fileName={fileName} />
-                                {/* ─────────────────────────  JSON Editor  ───────────────────────── */}
-                                <div className="relative mt-6 w-full max-w-3xl mx-auto">
-                                    {/* top bar */}
-                                    <div className="absolute inset-x-0 top-0 h-10 rounded-t-xl bg-[#1b1533] border-b border-[#302456] flex items-center justify-between px-4">
-                                        <span className="text-sm text-gray-400 select-none">
-                                            Paste or edit your JSON here…
-                                        </span>
 
+                                {/* ---------------- JSON Editor ---------------- */}
+                                <div className="mt-6 w-full max-w-3xl mx-auto bg-[#191919]/80 backdrop-blur-sm rounded-xl border border-gray-800 overflow-hidden shadow-lg">
+                                    {/* top bar */}
+                                    <div className="flex items-center justify-between h-10 px-4 border-b border-gray-800">
+                                        <span className="text-sm text-gray-400 select-none">
+                                            Paste or edit your text here…
+                                        </span>
                                         <span className="px-3 py-1 rounded-md bg-[#34384b] text-xs font-semibold text-gray-300 tracking-wider select-none">
                                             JSON
                                         </span>
@@ -231,15 +214,23 @@ export default function TranslatorPage() {
                                         onChange={e => setJsonInput(e.target.value)}
                                         spellCheck={false}
                                         placeholder="{}"
-                                        className="w-full h-56 resize-none bg-[#1e1739] rounded-b-xl border border-[#302456] pt-12 pb-4 px-4 font-mono text-sm text-gray-100 focus:border-[#8B5CF6] focus:ring-2 focus:ring-secondary/30 outline-none placeholder-gray-500 shadow-inner transition-colors"
-                                        style={{
-                                            boxShadow: 'none',
-                                            borderWidth: '1px',
-                                            borderStyle: 'solid',
-                                            borderColor: '#302456',
-                                        }}
+                                        className="w-full h-56 resize-none bg-transparent px-4 py-4 font-mono text-sm text-gray-100 focus:outline-none  placeholder-gray-500"
                                     />
                                 </div>
+
+                                {/* live preview (only first target language) */}
+                                {lastPayload && translationResult && lastTargetCodes.length > 0 && (
+                                    <TranslationPreview
+                                        original={lastPayload}
+                                        translated={translationResult[lastTargetCodes[0]] ?? {}}
+                                        targetLangCode={lastTargetCodes[0]}
+                                        targetShortcut={
+                                            LANGUAGE_OPTIONS.find(
+                                                l => l.code === lastTargetCodes[0],
+                                            )?.shortcut ?? lastTargetCodes[0]
+                                        }
+                                    />
+                                )}
                             </>
                         )}
 
@@ -258,7 +249,6 @@ export default function TranslatorPage() {
                             <header className="flex justify-between items-center mb-6">
                                 <h3 className="text-xl font-medium">Choose target languages</h3>
                                 <span className="text-base text-gray-200 font-semibold">
-                                    <span style={{ color: '#a78bfa' }}> Selected </span>
                                     <span className="font-semibold" style={{ color: '#a78bfa' }}>
                                         {selectedShortcuts.size}
                                     </span>{' '}
@@ -296,75 +286,29 @@ export default function TranslatorPage() {
                             )}
                         </div>
                         {/* buttons */}
-                        <div className="bg-[#191919]/70 backdrop-blur-sm rounded-lg p-4 mt-4 flex flex-col sm:flex-row sm:justify-between gap-4">
+                        <div className="bg-[#191919]/70 backdrop-blur-sm rounded-lg p-4 mt-4 flex flex-col  gap-4">
                             <Toggle
-                                label="Keep keys order"
+                                label="Save translation"
+                                checked={minify}
+                                onChange={setMinify}
+                            />
+                            <Toggle
+                                label="Pro translayte"
                                 checked={keepOrder}
                                 onChange={setKeepOrder}
                             />
-                            <Toggle label="Minify output" checked={minify} onChange={setMinify} />
                         </div>
                         <div className="flex flex-col sm:flex-row gap-4 mt-4">
                             <TranslateButton onClick={handleTranslate} loading={isTranslating} />
-                            <button
+                            {/* <button
                                 onClick={handleReset}
                                 disabled={isTranslating}
                                 className="inline-flex items-center justify-center px-8 py-4 rounded-lg font-semibold text-gray-200 bg-[#191919]/80"
                             >
                                 <i className="fa-solid fa-rotate-left mr-2" />
-                            </button>
+                            </button> */}
                         </div>
-
-                        {/* ---------- Translation Result ---------- */}
-                        {translationResult && (
-                            <div className="mt-8">
-                                <h3 className="text-lg font-semibold mb-2 text-gray-200">
-                                    Translation Result
-                                </h3>
-                                <div className="overflow-x-auto bg-[#18103a]/80 border border-[#2d2250] rounded-2xl p-4 shadow-lg">
-                                    <table className="min-w-full text-sm">
-                                        <thead>
-                                            <tr>
-                                                <th className="text-left text-gray-400 pb-2 pr-4">
-                                                    Key
-                                                </th>
-                                                {Object.keys(translationResult).map(lang => (
-                                                    <th
-                                                        key={lang}
-                                                        className="text-left text-gray-400 pb-2 pr-4"
-                                                    >
-                                                        {LANGUAGE_OPTIONS.find(l => l.code === lang)
-                                                            ?.shortcut || lang}
-                                                    </th>
-                                                ))}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {/* Show all keys from the first language */}
-                                            {Object.keys(
-                                                translationResult[
-                                                    Object.keys(translationResult)[0]
-                                                ] || {},
-                                            ).map(key => (
-                                                <tr key={key}>
-                                                    <td className="pr-4 py-1 font-mono text-gray-300">
-                                                        {key}
-                                                    </td>
-                                                    {Object.keys(translationResult).map(lang => (
-                                                        <td
-                                                            key={lang}
-                                                            className="pr-4 py-1 text-gray-100"
-                                                        >
-                                                            {translationResult[lang][key]}
-                                                        </td>
-                                                    ))}
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        )}
+                        {/* … rest of the unchanged file … */}
                     </aside>
                 </div>
             </main>

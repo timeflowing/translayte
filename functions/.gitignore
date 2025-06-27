@@ -1,0 +1,33 @@
+# Compiled JavaScript files
+lib/**/*.js
+lib/**/*.js.map
+
+# TypeScript v1 declaration files
+typings/
+
+# Node.js dependency directory
+node_modules/
+*.local
+# --- core ---
+node_modules/
+.next/            # Next.js build output
+out/              # `next export` static output
+.vercel/          # Vercel platform cache
+dist/             # if you ever build with tsc
+
+# --- tooling caches ---
+.swp          # Vim swap files
+.idea/        # JetBrains IDEs
+.vscode/
+.DS_Store     # macOS finder cruft
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- env / secrets ---
+.env*
+!.env.example   # keep the sample
+
+# --- misc ---
+coverage/
+turbo/

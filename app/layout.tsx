@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import localFont from 'next/font/local';
 import './globals.css';
+import { AuthProvider } from './context/AuthContext';
 
 const geistSans = localFont({
     src: './fonts/GeistVF.woff',
@@ -18,10 +19,7 @@ export const metadata: Metadata = {
     description:
         'Save time and reduce errors with our intuitive translation tool for React Native & beyond.',
     icons: {
-        icon: [
-            { url: '/fav.svg', type: 'image/svg+xml' },
-            { url: '/favicon.ico', sizes: '32x32', type: 'image/x-icon' }, // Add this line
-        ],
+        icon: [{ url: '/fav.svg', type: 'image/svg+xml' }],
     },
 };
 
@@ -33,7 +31,7 @@ export default function RootLayout({
     return (
         <html lang="en">
             <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-                {children}
+                <AuthProvider>{children}</AuthProvider>
             </body>
         </html>
     );
