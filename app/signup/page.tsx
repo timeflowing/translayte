@@ -9,7 +9,7 @@ import GoogleLoginButton from '../utils/signInWithGoogle';
 import GitHubLoginButton from '../utils/singInWithGithub';
 import SynapseAnimation from '../utils/SynapseAnimation';
 
-const RegisterPage: React.FC = () => {
+const RegisterPage = () => {
     const [email, setEmail] = useState('');
     const [displayName, setDisplayName] = useState('');
     const [password, setPassword] = useState('');
@@ -37,13 +37,16 @@ const RegisterPage: React.FC = () => {
             }
             router.replace('/translator'); // or wherever your dashboard/landing is
         } catch (err) {
-            setError(
-                err?.code === 'auth/email-already-in-use'
-                    ? 'Email already in use.'
-                    : 'Failed to create account. Please check your details.',
-            );
-        } finally {
-            setCreating(false);
+            if (err && typeof err === 'object' && 'code' in err) {
+                const error = err as { code: string };
+                setError(
+                    error.code === 'auth/email-already-in-use'
+                        ? 'Email already in use.'
+                        : 'Failed to create account. Please check your details.',
+                );
+            } else {
+                setError('Failed to create account. Please check your details.');
+            }
         }
     };
 
