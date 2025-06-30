@@ -14,8 +14,8 @@ export async function POST(req: NextRequest) {
 
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
-    success_url: `${process.env.NEXT_PUBLIC_HOST}/billing/success`,
-    cancel_url:  `${process.env.NEXT_PUBLIC_HOST}/billing/cancel`,
+    success_url: `${process.env._HOST}/billing/success`,
+    cancel_url:  `${process.env._HOST}/billing/cancel`,
     payment_method_types: ['card'],
     customer_email: fbUser.email!,
     line_items: [{ price: process.env.STRIPE_PRICE_ID!, quantity: 1 }],

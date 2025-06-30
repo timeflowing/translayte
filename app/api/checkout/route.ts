@@ -23,10 +23,10 @@ export async function POST(request: Request) {
         },
       ],
       success_url: `${
-        request.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL
+        request.headers.get("origin") || process.env._SITE_URL
       }/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${
-        request.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL
+        request.headers.get("origin") || process.env._SITE_URL
       }/cancel`,
     });
 
