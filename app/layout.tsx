@@ -15,7 +15,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-    title: 'Translayte - Effortless JSON Translation Tool',
+    title: 'Translayte - Effortless Translation Tool',
     description:
         'Save time and reduce errors with our intuitive translation tool for React Native & beyond.',
     icons: {

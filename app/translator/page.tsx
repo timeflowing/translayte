@@ -20,7 +20,7 @@ const LANGUAGE_OPTIONS = [
     { code: 'de_DE', name: 'German', shortcut: 'DE' },
     { code: 'es_XX', name: 'Spanish', shortcut: 'ES' },
     { code: 'ru_RU', name: 'Russian', shortcut: 'RU' },
-    { code: 'zh_CN', name: 'Chinese (Simplified)', shortcut: 'ZH' },
+    { code: 'zh_CN', name: 'Chinese', shortcut: 'ZH' },
     { code: 'ar_AR', name: 'Arabic', shortcut: 'AR' },
     { code: 'hi_IN', name: 'Hindi', shortcut: 'HI' },
     { code: 'pl_PL', name: 'Polish', shortcut: 'PL' },
@@ -31,7 +31,16 @@ const LANGUAGE_OPTIONS = [
 /* ---------------------------------------------------------------- page */
 export default function TranslatorPage() {
     /* ---------------- state */
+    const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
 
+    const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setJsonInput(e.target.value);
+        const el = textAreaRef.current;
+        if (el) {
+            el.style.height = 'auto';
+            el.style.height = `${el.scrollHeight}px`;
+        }
+    };
     const [profileOpen, setProfileOpen] = useState(false);
     const { user, loading: authLoading } = useAuth();
     console.log(user);
@@ -58,7 +67,7 @@ export default function TranslatorPage() {
     /* JSON-file mode */
     const [jsonInput, setJsonInput] = useState('');
     // const [selectedTab, setSelectedTab] = useState<'json' | 'table'>('json');
-    const [selectedView, setSelectedView] = useState<'json' | 'table' | 'all'>('json');
+    const [selectedView, setSelectedView] = useState<'json' | 'table' | 'all' | 'original'>('json');
     const [selectedLangTab, setSelectedLangTab] = useState<string | null>(null);
     /* misc */
     const [isTranslating, setIsTranslating] = useState(false);
@@ -78,7 +87,7 @@ export default function TranslatorPage() {
                 next.delete(shortcut);
                 setLangLimitInfo(null);
             } else {
-                if (next.size >= 2) {
+                if (!isPro && next.size >= 2) {
                     setLangLimitInfo('Upgrade to Pro to select more than 2 languages.');
                     return prev;
                 }
@@ -271,12 +280,20 @@ export default function TranslatorPage() {
         window.location.href = url;
     };
     useEffect(() => {
-        if (!user) return;
+        if (!user || !user.uid) return; // ⬅️ wait for user
+
         const unsub = onSnapshot(doc(db, 'users', user.uid), snap => {
             setKeysThisMonth(snap.data()?.keys_month || 0);
         });
         return () => unsub();
     }, [user]);
+    type ViewTabKey = 'json' | 'table' | 'original' | 'all';
+    const VIEW_TABS: { key: ViewTabKey; label: string }[] = [
+        { key: 'json', label: 'JSON' },
+        { key: 'table', label: 'Table' },
+        { key: 'original', label: 'Original' },
+        { key: 'all', label: 'All' },
+    ];
     return (
         <>
             {/* background layer */}
@@ -307,7 +324,7 @@ export default function TranslatorPage() {
                                 onClick={() => setProfileOpen(o => !o)}
                                 className="px-3 py-1 rounded hover:bg-gray-700 flex items-center gap-1"
                             >
-                                Hi, {user.email!.split('@')[0]}
+                                Hello there, {user.email ? user.email.split('@')[0] : 'User'}
                                 <i className="fa-solid fa-chevron-down text-xs" />
                             </button>
                             {profileOpen && (
@@ -363,11 +380,19 @@ export default function TranslatorPage() {
 
                                 {!translationResult && (
                                     <textarea
+                                        ref={textAreaRef}
                                         value={jsonInput}
-                                        onChange={e => setJsonInput(e.target.value)}
+                                        onChange={handleTextareaChange}
                                         spellCheck={false}
                                         placeholder="Paste or edit your text here…"
-                                        className="w-full h-56 resize-none bg-transparent px-4 py-4 font-mono text-sm text-gray-100 focus:outline-none placeholder-gray-500"
+                                        className="w-full resize-none bg-[#18181b]/90 border border-[#312e81] rounded-xl px-4 py-4 font-mono text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#8B5CF6] placeholder-gray-500 shadow-lg transition selection:bg-violet-500 selection:text-white"
+                                        style={{
+                                            caretColor: '#8B5CF6',
+                                            minHeight: '144px',
+                                            boxShadow: '0 2px 12px 0 rgba(139,92,246,0.06)',
+                                            backdropFilter: 'blur(4px)',
+                                            transition: 'box-shadow 0.2s',
+                                        }}
                                     />
                                 )}
                                 {translationResult && (
@@ -377,17 +402,17 @@ export default function TranslatorPage() {
                                             <div className="flex flex-wrap items-center gap-2 mb-4">
                                                 {/* View mode tabs */}
                                                 <div className="flex gap-2 mb-4">
-                                                    {(['json', 'table'] as const).map(mode => (
+                                                    {VIEW_TABS.map(tab => (
                                                         <button
-                                                            key={mode}
-                                                            onClick={() => setSelectedView(mode)}
+                                                            key={tab.key}
+                                                            onClick={() => setSelectedView(tab.key)}
                                                             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                                                                selectedView === mode
+                                                                selectedView === tab.key
                                                                     ? 'bg-[#8B5CF6] text-white'
                                                                     : 'bg-[#1f1f1f] text-gray-300 hover:bg-[#2a2a2a]'
                                                             }`}
                                                         >
-                                                            {mode === 'json' ? 'JSON' : 'Table'}
+                                                            {tab.label}
                                                         </button>
                                                     ))}
                                                 </div>
@@ -421,107 +446,136 @@ export default function TranslatorPage() {
                                                     </div>
                                                 )}
                                                 {/* Display selected translation view */}
-                                                <div className="max-h-[400px] overflow-auto">
-                                                    {selectedView === 'json' && selectedLangTab && (
-                                                        <div className="bg-[#111111] p-4 rounded-lg border border-gray-700 overflow-auto">
-                                                            <pre
-                                                                className="font-mono whitespace-pre text-sm leading-relaxed"
-                                                                dangerouslySetInnerHTML={{
-                                                                    __html: colorized
-                                                                        ? highlightJson(
-                                                                              prettyJson(
-                                                                                  selectedLangTab ===
-                                                                                      'ALL'
-                                                                                      ? Object.fromEntries(
-                                                                                            Object.entries(
-                                                                                                translationResult ??
-                                                                                                    {},
-                                                                                            ).map(
-                                                                                                ([
-                                                                                                    langCode,
-                                                                                                    entries,
-                                                                                                ]) => [
-                                                                                                    langCode.slice(
-                                                                                                        0,
-                                                                                                        2,
+                                                <div className="flex flex-col w-full min-h-[400px]">
+                                                    <div className="flex-1 w-full">
+                                                        {selectedView === 'json' &&
+                                                            selectedLangTab && (
+                                                                <div className="bg-[#111111] p-4 rounded-lg border border-gray-700 overflow-auto">
+                                                                    <pre
+                                                                        className="font-mono whitespace-pre text-sm leading-relaxed"
+                                                                        dangerouslySetInnerHTML={{
+                                                                            __html: colorized
+                                                                                ? highlightJson(
+                                                                                      prettyJson(
+                                                                                          selectedLangTab ===
+                                                                                              'ALL'
+                                                                                              ? Object.fromEntries(
+                                                                                                    Object.entries(
+                                                                                                        translationResult ??
+                                                                                                            {},
+                                                                                                    ).map(
+                                                                                                        ([
+                                                                                                            langCode,
+                                                                                                            entries,
+                                                                                                        ]) => [
+                                                                                                            langCode.slice(
+                                                                                                                0,
+                                                                                                                2,
+                                                                                                            ),
+                                                                                                            entries,
+                                                                                                        ],
                                                                                                     ),
-                                                                                                    entries,
-                                                                                                ],
-                                                                                            ),
-                                                                                        )
-                                                                                      : translationResult[
-                                                                                            selectedLangTab
-                                                                                        ] ?? {},
-                                                                              ),
-                                                                          )
-                                                                        : prettyJson(
-                                                                              selectedLangTab ===
-                                                                                  'ALL'
-                                                                                  ? Object.fromEntries(
-                                                                                        Object.entries(
-                                                                                            translationResult ??
-                                                                                                {},
-                                                                                        ).map(
-                                                                                            ([
-                                                                                                langCode,
-                                                                                                entries,
-                                                                                            ]) => [
-                                                                                                langCode.slice(
-                                                                                                    0,
-                                                                                                    2,
-                                                                                                ),
-                                                                                                entries,
-                                                                                            ],
-                                                                                        ),
-                                                                                    )
-                                                                                  : translationResult[
-                                                                                        selectedLangTab
-                                                                                    ] ?? {},
-                                                                          ),
-                                                                }}
-                                                            />
-                                                        </div>
-                                                    )}
-
-                                                    {selectedView === 'table' &&
-                                                        selectedLangTab && (
-                                                            <div className="overflow-x-auto bg-[#111111] p-4 rounded-lg border border-gray-700">
-                                                                <table className="w-full text-left text-sm text-gray-300">
-                                                                    <thead>
-                                                                        <tr>
-                                                                            <th className="py-2 px-4 border-b border-gray-600">
-                                                                                Key
-                                                                            </th>
-                                                                            <th className="py-2 px-4 border-b border-gray-600">
-                                                                                {selectedLangTab}
-                                                                            </th>
-                                                                        </tr>
-                                                                    </thead>
-                                                                    <tbody>
-                                                                        {Object.entries(
-                                                                            selectedLangTab ===
-                                                                                'ALL'
-                                                                                ? mergeAllTranslations(
-                                                                                      translationResult ??
-                                                                                          {},
+                                                                                                )
+                                                                                              : translationResult[
+                                                                                                    selectedLangTab
+                                                                                                ] ??
+                                                                                                    {},
+                                                                                      ),
                                                                                   )
-                                                                                : translationResult[
-                                                                                      selectedLangTab
-                                                                                  ] ?? {},
-                                                                        ).map(([key, value]) => (
-                                                                            <tr key={key}>
-                                                                                <td className="py-1 px-4 border-b border-gray-800 text-orange-400">
-                                                                                    {key}
-                                                                                </td>
-                                                                                <td className="py-1 px-4 border-b border-gray-800 text-green-400">
-                                                                                    {value}
-                                                                                </td>
+                                                                                : prettyJson(
+                                                                                      selectedLangTab ===
+                                                                                          'ALL'
+                                                                                          ? Object.fromEntries(
+                                                                                                Object.entries(
+                                                                                                    translationResult ??
+                                                                                                        {},
+                                                                                                ).map(
+                                                                                                    ([
+                                                                                                        langCode,
+                                                                                                        entries,
+                                                                                                    ]) => [
+                                                                                                        langCode.slice(
+                                                                                                            0,
+                                                                                                            2,
+                                                                                                        ),
+                                                                                                        entries,
+                                                                                                    ],
+                                                                                                ),
+                                                                                            )
+                                                                                          : translationResult[
+                                                                                                selectedLangTab
+                                                                                            ] ?? {},
+                                                                                  ),
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            )}
+
+                                                        {selectedView === 'table' &&
+                                                            selectedLangTab && (
+                                                                <div className="overflow-x-auto bg-[#111111] p-4 rounded-lg border border-gray-700">
+                                                                    <table className="w-full text-left text-sm text-gray-300">
+                                                                        <thead>
+                                                                            <tr>
+                                                                                <th className="py-2 px-4 border-b border-gray-600">
+                                                                                    Key
+                                                                                </th>
+                                                                                <th className="py-2 px-4 border-b border-gray-600">
+                                                                                    {
+                                                                                        selectedLangTab
+                                                                                    }
+                                                                                </th>
                                                                             </tr>
-                                                                        ))}
-                                                                    </tbody>
-                                                                </table>
+                                                                        </thead>
+                                                                        <tbody>
+                                                                            {Object.entries(
+                                                                                selectedLangTab ===
+                                                                                    'ALL'
+                                                                                    ? mergeAllTranslations(
+                                                                                          translationResult ??
+                                                                                              {},
+                                                                                      )
+                                                                                    : translationResult[
+                                                                                          selectedLangTab
+                                                                                      ] ?? {},
+                                                                            ).map(
+                                                                                ([key, value]) => (
+                                                                                    <tr key={key}>
+                                                                                        <td className="py-1 px-4 border-b border-gray-800 text-orange-400">
+                                                                                            {key}
+                                                                                        </td>
+                                                                                        <td className="py-1 px-4 border-b border-gray-800 text-green-400">
+                                                                                            {value}
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                ),
+                                                                            )}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                            )}
+                                                        {selectedView === 'original' && (
+                                                            <div className="bg-[#111111] p-4 rounded-lg border border-gray-700">
+                                                                <textarea
+                                                                    value={jsonInput}
+                                                                    onChange={e =>
+                                                                        setJsonInput(e.target.value)
+                                                                    }
+                                                                    spellCheck={false}
+                                                                    className="w-full bg-transparent font-mono text-sm text-gray-200 focus:outline-none resize-none"
+                                                                    style={{
+                                                                        minHeight: '200px',
+                                                                        color: '#e5e7eb', // text-gray-200
+                                                                        // No blue, just your neutrals
+                                                                    }}
+                                                                />
+                                                                <div className="mt-2 text-xs text-gray-500">
+                                                                    You can edit the original source
+                                                                    here before re-translating.
+                                                                </div>
                                                             </div>
                                                         )}
+                                                    </div>
                                                 </div>
                                             </div>
 
@@ -762,8 +816,14 @@ const DropZone: React.FC<DZProps> = ({ onSelect, fileName, translationResult }) 
             particles.forEach(p => {
                 p.x += p.vx;
                 p.y += p.vy;
-                if (p.x < 0 || p.x > canvas.offsetWidth) p.vx *= -1;
-                if (p.y < 0 || p.y > canvas.offsetHeight) p.vy *= -1;
+
+                // Wrap horizontally
+                if (p.x < 0) p.x = canvas.offsetWidth;
+                if (p.x > canvas.offsetWidth) p.x = 0;
+
+                // Wrap vertically
+                if (p.y < 0) p.y = canvas.offsetHeight;
+                if (p.y > canvas.offsetHeight) p.y = 0;
             });
 
             // More synapses: lower the distance threshold
@@ -1095,7 +1155,7 @@ const LanguageGrid = ({
                             className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#8B5CF6]/20 text-[#8B5CF6] font-medium hover:bg-[#221a3e] transition text-sm cursor-pointer"
                             onClick={() => setExpanded(true)}
                         >
-                            <i className="fa-solid fa-chevron-down" /> Show more languages
+                            <i className="fa-solid fa-chevron-down" /> More languages
                         </button>
                     </div>
                 )}
@@ -1105,7 +1165,7 @@ const LanguageGrid = ({
                             className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#8B5CF6]/20 text-[#8B5CF6] font-medium hover:bg-[#221a3e] transition text-sm cursor-pointer"
                             onClick={() => setExpanded(false)}
                         >
-                            <i className="fa-solid fa-chevron-up" /> Show less
+                            <i className="fa-solid fa-chevron-up" /> Hide
                         </button>
                     </div>
                 )}

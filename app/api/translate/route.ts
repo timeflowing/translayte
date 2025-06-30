@@ -1,5 +1,4 @@
-import {  adminAuth, adminDB } from '@/app/lib/firebaseAdmin';
-
+import { adminAuth, adminDB } from '@/app/lib/firebaseAdmin';
 import OpenAI from 'openai';
 import { cert as makeCert } from 'firebase-admin/app';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -30,119 +29,129 @@ You are a localisation engine. Your task is to translate UI strings.
 • Maintain line order and structure.
 • Output format: <key>: <translated value>
 `.trim();
-
+type TranslationJson = { [key: string]: string | TranslationJson };
 export async function POST(req: Request) {
-  // … your adminAuth / adminDB imports and token‐verify above …
-   const authHeader = req.headers.get('authorization') || '';
-  const idToken    = authHeader.replace(/^Bearer\s+/i, '');
-  const decoded    = await adminAuth.verifyIdToken(idToken);
+  const authHeader = req.headers.get('authorization') || '';
+  const idToken = authHeader.replace(/^Bearer\s+/i, '');
+  const decoded = await adminAuth.verifyIdToken(idToken);
 
 const userRef  = adminDB.collection('users').doc(decoded.uid);
 const userSnap = await userRef.get();
-const user     = userSnap.exists
-  ? userSnap.data()
-  : { keys_month: 0, subscription: { status: null } };
+const userData = userSnap.exists ? userSnap.data() : {};
 
-  // free: 200/mo; pro: 5 000/mo
-  if (user?.subscription.status !== 'active' && user?.keys_month + BATCH_SIZE > MAX_KEYS) {
-    return new Response(
-      JSON.stringify({ error: 'Free quota exceeded', type: 'quota' }),
-      { status: 429, headers: { 'Content-Type': 'application/json' } }
-    );
-  }
-  if (user?.subscription.status === 'active' && user?.keys_month + BATCH_SIZE > 5000) {
-    return new Response(
-      JSON.stringify({ error: 'Pro quota exceeded', type: 'quota' }),
-      { status: 429, headers: { 'Content-Type': 'application/json' } }
-    );
-  }
+const keysMonth = typeof userData?.keys_month === 'number' ? userData?.keys_month : 0;
+const subscription = userData?.subscription || { status: null };
+
+// free: 200/mo; pro: 5 000/mo
+if (subscription.status !== 'active' && keysMonth + BATCH_SIZE > MAX_KEYS) {
+  return new Response(
+    JSON.stringify({ error: 'Free quota exceeded', type: 'quota' }),
+    { status: 429, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+if (subscription.status === 'active' && keysMonth + BATCH_SIZE > 5000) {
+  return new Response(
+    JSON.stringify({ error: 'Pro quota exceeded', type: 'quota' }),
+    { status: 429, headers: { 'Content-Type': 'application/json' } }
+  );
+}
   
   // …now your existing body-parsing & flattening logic…
   const body = await req.json();
   const { json, texts, to } = body;
-    if (!json && !texts) {
-        return badRequest('Provide either "json" or "texts".');
-    }
+  if (!json && !texts) {
+    return badRequest('Provide either "json" or "texts".');
+  }
 
-    const flat: Record<string, string> = json
-        ? flattenJson(json)
-        : Object.fromEntries((texts as string[]).map((t, i) => [i.toString(), t]));
+  const flat: Record<string, string> = json
+    ? flattenJson(json)
+    : Object.fromEntries((texts as string[]).map((t, i) => [i.toString(), t]));
 
-    const keys = Object.keys(flat);
-    if (keys.length > MAX_KEYS) {
-        return badRequest(`Too many entries (${keys.length}). Limit is ${MAX_KEYS}.`);
-    }
-
-    const targets = Array.isArray(to) ? to : [to];
-    const translations: Record<string, string> = {};
+  const keys = Object.keys(flat);
+  if (keys.length > MAX_KEYS) {
+    return badRequest(`Too many entries (${keys.length}). Limit is ${MAX_KEYS}.`);
+  }
 
 
-    try {
-        for (const lang of targets) {
-            const translatedFlat: Record<string, string> = {};
-            const batches = chunk(Object.entries(flat), BATCH_SIZE);
+const translations: Record<string, TranslationJson | string[]> = {};
+  const targets = Array.isArray(to) ? to : [to];
 
-            for (const batch of batches) {
-                const prompt = [
-                    `Translate the following to **${lang}**:`,
-                    batch.map(([k, v]) => `${k}: ${v}`).join('\n')
-                ].join('\n\n');
+  try {
+    for (const lang of targets) {
+      const translatedFlat: Record<string, string> = {};
+      const batches = chunk(Object.entries(flat), BATCH_SIZE);
 
-                const completion = await openai.chat.completions.create({
-                    model: MODEL,
-                    max_tokens: prompt.split(/\s+/).length * 2,
-                    temperature: 0.2,
-                    top_p: 0.9,
-                    messages: [
-                        { role: 'system', content: SYSTEM_PROMPT },
-                        { role: 'user', content: prompt }
-                    ],
-                });
+      for (const batch of batches) {
+        const prompt = [
+          `Translate the following to **${lang}**:`,
+          batch.map(([k, v]) => `${k}: ${v}`).join('\n')
+        ].join('\n\n');
 
-                const response = completion.choices[0].message.content?.trim() ?? '';
-                response.split('\n').forEach(line => {
-                    const sepIndex = line.indexOf(':');
-                    if (sepIndex > -1) {
-                        const k = line.slice(0, sepIndex).trim();
-                        const v = line.slice(sepIndex + 1).trim();
-                        if (k && v) translatedFlat[k] = v;
-                    }
-                });
-            }
-
-            translations[lang] = json ? unflattenJson(translatedFlat) : Object.values(translatedFlat);
-        }
-           await userRef.update({
-  keys_month: FieldValue.increment(BATCH_SIZE),
-});
-        return new Response(JSON.stringify({ translation: translations }), {
-            headers: { 'Content-Type': 'application/json' },
-            status: 200,
+        const completion = await openai.chat.completions.create({
+          model: MODEL,
+          max_tokens: prompt.split(/\s+/).length * 2,
+          temperature: 0.2,
+          top_p: 0.9,
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: prompt }
+          ],
         });
 
-    } catch (err) {
-  if (err instanceof Error) {
-    console.log(err.message);
-  } else {
-    console.log('Unknown error');
-  
-
-        return new Response(JSON.stringify({ error: err?.message || 'Translation failed' }), { status: 500 });
+        const response = completion.choices[0].message.content?.trim() ?? '';
+        response.split('\n').forEach(line => {
+          const sepIndex = line.indexOf(':');
+          if (sepIndex > -1) {
+            const k = line.slice(0, sepIndex).trim();
+            const v = line.slice(sepIndex + 1).trim();
+            if (k && v) translatedFlat[k] = v;
+          }
+        });
+      }
+for (const [k, v] of Object.entries(flat)) {
+  if (!(k in translatedFlat)) {
+    translatedFlat[k] = v; // or `[MISSING TRANSLATION] ${v}`
+  }
+}
+      // For json input, restore structure; for texts, just array
+      translations[lang] = json ? unflattenJson(translatedFlat) : Object.values(translatedFlat);
     }
+
+    await userRef.update({
+      keys_month: FieldValue.increment(BATCH_SIZE),
+    });
+
+    return new Response(JSON.stringify({ translation: translations }), {
+      headers: { 'Content-Type': 'application/json' },
+      status: 200,
+    });
+
+  } catch (err) {
+  console.error('[Translayte API] Translation error:', err);
+
+  const message =
+    typeof err === 'object' && err && 'message' in err
+      ? (err).message
+      : 'Translation failed';
+
+  return new Response(
+    JSON.stringify({ error: message }),
+    { status: 500, headers: { 'Content-Type': 'application/json' } }
+  );
+}
 }
 
 // ------------- Helpers -------------
 
 function chunk<T>(arr: T[], size: number): T[][] {
-    const out: T[][] = [];
-    for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-    return out;
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
 }
-
-function flattenJson(obj: any, res: Record<string, string> = {}): Record<string, string> {
+function flattenJson(obj: TranslationJson, prefix = '', res: Record<string, string> = {}) {
     for (const key in obj) {
         const val = obj[key];
-        const newKey =   key;
+        const newKey = prefix ? `${prefix}.${key}` : key;
         if (typeof val === 'string') {
             res[newKey] = val;
         } else if (val && typeof val === 'object') {
@@ -152,8 +161,8 @@ function flattenJson(obj: any, res: Record<string, string> = {}): Record<string,
     return res;
 }
 
-function unflattenJson(flat: Record<string, string>): Record<string, string> {
-    const out: Record<string, string> = {};
+function unflattenJson(flat: Record<string, string>): TranslationJson {
+    const out: TranslationJson = {};
     for (const flatKey in flat) {
         const path = flatKey.split('.');
         let cur = out;
@@ -161,8 +170,8 @@ function unflattenJson(flat: Record<string, string>): Record<string, string> {
             if (idx === path.length - 1) {
                 cur[seg] = flat[flatKey];
             } else {
-                cur[seg] = cur[seg] ?? {};
-                cur = cur[seg];
+                if (!cur[seg]) cur[seg] = {};
+                cur = cur[seg] as TranslationJson;
             }
         });
     }
@@ -170,5 +179,5 @@ function unflattenJson(flat: Record<string, string>): Record<string, string> {
 }
 
 function badRequest(msg: string): Response {
-    return new Response(JSON.stringify({ error: msg }), { status: 400 });
+  return new Response(JSON.stringify({ error: msg }), { status: 400 });
 }
