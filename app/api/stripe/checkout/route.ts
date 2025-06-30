@@ -5,7 +5,8 @@ import Stripe from 'stripe';
 import * as admin from 'firebase-admin';
 
 admin.initializeApp();
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2023-10-16' });
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!,  { apiVersion: "2025-02-24.acacia" }
+);
 
 export async function POST(req: NextRequest) {
   const { token } = await req.json();               // Firebase ID token
