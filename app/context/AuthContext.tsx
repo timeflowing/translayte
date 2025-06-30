@@ -4,11 +4,11 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../lib/firebaseClient';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-
-interface User {
+export interface User {
+    uid: string;
     firstName: string;
-    uid: string; // 👈 add this!
     lastName: string;
+    displayName: string;
     email: string;
     photoURL?: string;
     phone?: string;
@@ -29,11 +29,16 @@ interface User {
 }
 
 interface AuthContext {
-    user: User | null;
+    user: User | null; // Your Firestore user profile
+    authUser: import('firebase/auth').User | null; // The Firebase Auth user object
     loading: boolean;
 }
 
-const AuthCtx = createContext<AuthContext>({ user: null, loading: true });
+const AuthCtx = createContext<AuthContext>({
+    user: null,
+    authUser: null,
+    loading: true,
+});
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [authUser, loading] = useAuthState(auth); // Firebase Auth user
@@ -51,7 +56,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         const [firstName, ...rest] = (authUser.displayName || '').split(' ');
                         const lastName = rest.join(' ');
                         const profile: User = {
-                            uid: `${Date.now() + 7 * 24 * 60 * 60 * 1000}`, // 👈 add this!
+                            uid: authUser.uid,
+                            displayName: authUser.displayName || '',
                             firstName,
                             lastName,
                             email: authUser.email ?? '',
@@ -74,7 +80,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     }, [loading, authUser]);
 
-    return <AuthCtx.Provider value={{ user, loading }}>{children}</AuthCtx.Provider>;
+    return (
+        <AuthCtx.Provider value={{ user, authUser: authUser ?? null, loading }}>
+            {children}
+        </AuthCtx.Provider>
+    );
 }
 
 export const useAuth = () => useContext(AuthCtx);

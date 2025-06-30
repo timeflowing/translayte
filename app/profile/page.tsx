@@ -5,7 +5,29 @@ import { onAuthStateChanged, updateProfile } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db as firestore } from '../lib/firebaseClient';
 import SynapseAnimation from '../utils/SynapseAnimation';
-import { useAuth } from '../context/AuthContext';
+import { useAuthState } from 'react-firebase-hooks/auth';
+
+const BLANK_PROFILE: UserProfile = {
+    firstName: '',
+    lastName: '',
+    email: '',
+    photoURL: '',
+    phone: '',
+    plan: '',
+    trialEndsAt: '',
+    company: '',
+    jobTitle: '',
+    bio: '',
+    country: '',
+    state: '',
+    city: '',
+    zip: '',
+    githubConnected: false,
+    googleConnected: false,
+    slackConnected: false,
+    subscription: { status: null },
+    keys_month: 0,
+};
 interface UserProfile {
     firstName: string;
     lastName: string;
@@ -37,7 +59,7 @@ function getTrialDaysLeft(trialEndsAt: string | null) {
 }
 
 const ProfilePage = () => {
-    const { user: firebaseUser } = useAuth();
+    const [firebaseUser] = useAuthState(auth);
     const [profile, setProfile] = useState<UserProfile>(); // Profile from Firestore
     const [loading, setLoading] = useState(true);
     const [edit, setEdit] = useState(true);
@@ -55,7 +77,7 @@ const ProfilePage = () => {
                 const userRef = doc(firestore, 'users', user.uid);
                 const snap = await getDoc(userRef);
                 if (snap.exists()) {
-                    setProfile({ ...snap.data() });
+                    setProfile(snap.data() as UserProfile);
                 } else {
                     // Create with basic info if missing
                     const data = {
@@ -78,12 +100,13 @@ const ProfilePage = () => {
     }, []);
 
     // Controlled fields (make editable)
-    const [fields, setFields] = useState<any>({});
+    const [fields, setFields] = useState<UserProfile>(BLANK_PROFILE);
+
     useEffect(() => {
-        setFields(profile || {});
+        if (profile) setFields(profile);
     }, [profile]);
 
-    const handleField = (k: string, v: string) => setFields((f: any) => ({ ...f, [k]: v }));
+    const handleField = (k: string, v: string) => setFields(f => ({ ...f, [k]: v }));
     console.log(firebaseUser);
     // Save handler (profile to Firestore, displayName to Firebase)
     async function handleSave(e: React.FormEvent) {
@@ -305,7 +328,7 @@ const ProfilePage = () => {
                                     className="px-4 py-2 rounded-lg bg-transparent border border-[#282443] text-gray-200"
                                     onClick={() => {
                                         setEdit(false);
-                                        setFields(profile);
+                                        if (profile) setFields(profile);
                                         setError('');
                                         setSuccess('');
                                     }}
@@ -377,15 +400,15 @@ const ProfilePage = () => {
                         <div className="flex flex-col gap-2">
                             <ConnectedAccount
                                 provider="GitHub"
-                                connected={profile?.githubConnected}
+                                connected={!!profile?.githubConnected}
                             />
                             <ConnectedAccount
                                 provider="Google"
-                                connected={profile?.googleConnected}
+                                connected={!!profile?.googleConnected}
                             />
                             <ConnectedAccount
                                 provider="Slack"
-                                connected={profile?.slackConnected}
+                                connected={!!profile?.slackConnected}
                             />
                         </div>
                     </SectionCard>
