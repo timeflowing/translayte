@@ -1,32 +1,78 @@
-// app/context/AuthContext.tsx
-'use client';
-import React, { createContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth } from '../firebaseClient';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth, db } from '../lib/firebaseClient';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
-// Define context type
-type AuthContextType = {
+interface User {
+    firstName: string;
+    uid: string; // 👈 add this!
+    lastName: string;
+    email: string;
+    photoURL?: string;
+    phone?: string;
+    plan?: string;
+    trialEndsAt?: string;
+    company?: string;
+    jobTitle?: string;
+    bio?: string;
+    country?: string;
+    state?: string;
+    city?: string;
+    zip?: string;
+    githubConnected?: boolean;
+    googleConnected?: boolean;
+    slackConnected?: boolean;
+    subscription?: { status: string | null };
+    keys_month?: number;
+}
+
+interface AuthContext {
     user: User | null;
     loading: boolean;
-};
+}
 
-// Create the context
-const AuthCtx = createContext<AuthContextType>({
-    user: null,
-    loading: true,
-});
+const AuthCtx = createContext<AuthContext>({ user: null, loading: true });
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+    const [authUser, loading] = useAuthState(auth); // Firebase Auth user
     const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsub = onAuthStateChanged(auth, u => {
-            setUser(u); // Save Firebase user
-            setLoading(false); // Done loading
-        });
-        return unsub; // Clean up listener
-    }, []);
+        if (!loading && authUser) {
+            const userRef = doc(db, 'users', authUser.uid);
+            getDoc(userRef)
+                .then(snap => {
+                    if (snap.exists()) {
+                        setUser(snap.data() as User); // <- your Firestore profile
+                    } else {
+                        // initialize the user document with some defaults
+                        const [firstName, ...rest] = (authUser.displayName || '').split(' ');
+                        const lastName = rest.join(' ');
+                        const profile: User = {
+                            uid: `${Date.now() + 7 * 24 * 60 * 60 * 1000}`, // 👈 add this!
+                            firstName,
+                            lastName,
+                            email: authUser.email ?? '',
+                            photoURL: authUser.photoURL ?? '',
+                            plan: 'trial',
+                            trialEndsAt: new Date(
+                                Date.now() + 7 * 24 * 60 * 60 * 1000,
+                            ).toISOString(),
+                            keys_month: 0,
+                            subscription: { status: null },
+                        };
+                        setDoc(userRef, profile)
+                            .then(() => setUser(profile))
+                            .catch(err => console.error('Error creating user doc:', err));
+                    }
+                })
+                .catch(err => console.error('Error fetching user doc:', err));
+        } else {
+            setUser(null);
+        }
+    }, [loading, authUser]);
 
     return <AuthCtx.Provider value={{ user, loading }}>{children}</AuthCtx.Provider>;
-};
+}
+
+export const useAuth = () => useContext(AuthCtx);

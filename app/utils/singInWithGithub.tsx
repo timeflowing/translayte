@@ -1,7 +1,7 @@
 'use client';
 
 import { signInWithPopup, GithubAuthProvider } from 'firebase/auth';
-import { auth } from '@/app/firebaseClient';
+import { auth } from '../lib/firebaseClient';
 
 const GitHubLoginButton = () => {
     const handleLogin = async () => {

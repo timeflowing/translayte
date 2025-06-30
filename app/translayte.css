@@ -54,3 +54,13 @@
 /* duplicate the old scrollbar hide */
 ::-webkit-scrollbar { display:none; }
 html,body { -ms-overflow-style:none; scrollbar-width:none; }
+
+@keyframes ping-once {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.6; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-ping-once {
+  animation: ping-once 1s ease-out;
+}

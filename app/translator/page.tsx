@@ -3,7 +3,13 @@ import React, { useRef, useState, ChangeEvent, useEffect } from 'react';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import '../translayte.css';
 import { translateBatch } from '../utils/translator';
-import TranslationPreview from '../components/TranslationPreview';
+import { auth, db } from '../lib/firebaseClient';
+import { highlightJson, prettyJson } from '../utils/prettyJson';
+import { useAuth } from '../context/AuthContext';
+import { doc, onSnapshot } from 'firebase/firestore';
+
+import Link from 'next/link';
+import KeyValueContextInput from '../components/KeyValueContextInput';
 
 /* ---------------------------------------------------------------- data */
 const LANGUAGE_OPTIONS = [
@@ -22,32 +28,43 @@ const LANGUAGE_OPTIONS = [
     { code: 'tr_TR', name: 'Turkish', shortcut: 'TR' },
     { code: 'vi_VN', name: 'Vietnamese', shortcut: 'VI' },
 ] as const;
-
 /* ---------------------------------------------------------------- page */
 export default function TranslatorPage() {
     /* ---------------- state */
 
+    const [profileOpen, setProfileOpen] = useState(false);
+    const { user, loading: authLoading } = useAuth();
+    console.log(user);
+    const [keysThisMonth, setKeysThisMonth] = useState(0);
+    const [showPaywall, setShowPaywall] = useState(false);
+    const isPro = user?.subscription?.status === 'active';
     const [selectedShortcuts, setSelectedShortcuts] = useState<Set<string>>(
         new Set(['EN', 'IT', 'CS']),
     );
+    const [rows] = useState<{ key: string; value: string; context?: string }[]>([
+        { key: '', value: '', context: '' },
+    ]);
     const [mode, setMode] = useState<'file' | 'keys'>('file');
     const [keepOrder, setKeepOrder] = useState(true);
     const [minify, setMinify] = useState(false);
-    const [lastPayload, setLastPayload] = useState<Record<string, string> | null>(null);
+    // const [lastPayload, setLastPayload] = useState<Record<string, string> | null>(null);
     const [lastTargetCodes, setLastTargetCodes] = useState<string[]>([]);
     /* key-value mode */
-    const [rows, setRows] = useState<{ key: string; value: string; context?: string }[]>([
-        { key: '', value: '', context: '' },
-    ]);
+    // const [rows, setRows] = useState<{ key: string; value: string; context?: string }[]>([
+    //     { key: '', value: '', context: '' },
+    // ]);
+    const [colorized, setColorized] = useState(true);
 
     /* JSON-file mode */
     const [jsonInput, setJsonInput] = useState('');
-
+    // const [selectedTab, setSelectedTab] = useState<'json' | 'table'>('json');
+    const [selectedView, setSelectedView] = useState<'json' | 'table' | 'all'>('json');
+    const [selectedLangTab, setSelectedLangTab] = useState<string | null>(null);
     /* misc */
     const [isTranslating, setIsTranslating] = useState(false);
     const [langLimitInfo, setLangLimitInfo] = useState<string | null>(null);
     const [fileName, setFileName] = useState<string | null>(null);
-
+    const [selectedPreviewLang, setSelectedPreviewLang] = React.useState<string | null>(null);
     /* ---------- translation result (⚠️ FLAT) ---------- */
     const [translationResult, setTranslationResult] = useState<Record<
         string,
@@ -90,33 +107,70 @@ export default function TranslatorPage() {
     };
     type JsonValue = string | { [key: string]: JsonValue };
 
-    function flattenJson(
-        obj: JsonValue,
-        prefix = '',
-        res: Record<string, string> = {},
-    ): Record<string, string> {
+    function flattenJson(obj: JsonValue, res: Record<string, string> = {}): Record<string, string> {
         if (typeof obj !== 'object' || obj === null) {
             return res;
         }
 
         for (const key in obj) {
             const val = obj[key];
-            const newKey = prefix ? `${prefix}.${key}` : key;
             if (typeof val === 'string') {
-                res[newKey] = val;
+                res[key] = val;
             } else {
-                flattenJson(val, newKey, res);
+                flattenJson(val, res); // no prefix nesting
             }
         }
 
         return res;
     }
+    /* ---------------------------------------------------------------- copy / download */
+    const copyCurrent = () => {
+        if (!translationResult || !selectedLangTab) return;
+
+        /* JSON object we are currently looking at */
+        const data =
+            selectedLangTab === 'ALL'
+                ? Object.fromEntries(
+                      Object.entries(translationResult).map(([code, obj]) => [
+                          code.slice(0, 2),
+                          obj,
+                      ]),
+                  )
+                : translationResult[selectedLangTab] ?? {};
+
+        navigator.clipboard.writeText(JSON.stringify(data, null, minify ? 0 : 2));
+    };
+
+    const downloadCurrent = () => {
+        if (!translationResult || !selectedLangTab) return;
+
+        const data =
+            selectedLangTab === 'ALL'
+                ? Object.fromEntries(
+                      Object.entries(translationResult).map(([code, obj]) => [
+                          code.slice(0, 2),
+                          obj,
+                      ]),
+                  )
+                : translationResult[selectedLangTab] ?? {};
+
+        const blob = new Blob([JSON.stringify(data, null, minify ? 0 : 2)], {
+            type: 'application/json',
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = selectedLangTab === 'ALL' ? 'translations.json' : `translations.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
 
     /* ---------------- translate ---------------- */
     const handleTranslate = async () => {
         const targetCodes = LANGUAGE_OPTIONS.filter(l => selectedShortcuts.has(l.shortcut)).map(
             l => l.code,
         );
+
         if (targetCodes.length === 0) return;
 
         /* ---- build payload ---- */
@@ -156,9 +210,11 @@ export default function TranslatorPage() {
                     }
                 }),
             );
-            setLastPayload(payload); // 🔹 save EN side for preview
-            setLastTargetCodes(targetCodes); // 🔹 save target list
             setTranslationResult(Object.fromEntries(translationsArr));
+            // setLastPayload(payload);
+            setLastTargetCodes(targetCodes);
+            setSelectedLangTab(targetCodes[0] ?? null);
+            setSelectedPreviewLang(targetCodes[0] ?? null);
         } catch (e) {
             console.error('[Translayte] Unexpected failure:', e);
         } finally {
@@ -172,6 +228,55 @@ export default function TranslatorPage() {
     //     setJsonInput('');
     //     setTranslationResult(null);
     // };
+    function mergeAllTranslations(
+        translations: Record<string, Record<string, string>>,
+    ): Record<string, string> {
+        const merged: Record<string, string> = {};
+
+        for (const [lang, entries] of Object.entries(translations)) {
+            for (const [key, value] of Object.entries(entries)) {
+                const newKey = `${lang}:${key}`;
+                merged[newKey] = value;
+            }
+        }
+
+        return merged;
+    }
+    const tryTranslate = () => {
+        if (authLoading) return;
+        if (!user) {
+            window.location.href = '/login';
+            return;
+        }
+        if (!isPro && keysThisMonth >= 200) {
+            setShowPaywall(true);
+            return;
+        }
+        handleTranslate();
+    };
+
+    const goPro = async () => {
+        const user = auth.currentUser;
+        if (!user) {
+            // router.push('/login');
+            return;
+        }
+        const token = await user.getIdToken();
+        const res = await fetch('/api/stripe/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token }),
+        });
+        const { url } = await res.json();
+        window.location.href = url;
+    };
+    useEffect(() => {
+        if (!user) return;
+        const unsub = onSnapshot(doc(db, 'users', user.uid), snap => {
+            setKeysThisMonth(snap.data()?.keys_month || 0);
+        });
+        return () => unsub();
+    }, [user]);
     return (
         <>
             {/* background layer */}
@@ -179,73 +284,301 @@ export default function TranslatorPage() {
 
             {/* header */}
             <header className="fixed w-full z-50 bg-[#0F0F0F]/80 backdrop-blur-md border-b border-gray-800">
-                <div className="container mx-auto px-4 py-4 flex justify-between">
-                    <h1 className="text-xl font-bold gradient-text">Translayte</h1>
+                <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+                    {/* Logo/Home */}
+                    <Link href="/" className="text-xl font-bold gradient-text">
+                        Translayte
+                    </Link>
+
+                    {/* Usage pill */}
+                    {user && (
+                        <div className="text-sm text-gray-300 flex items-center gap-2">
+                            <i className="fa-solid fa-key text-yellow-400" />
+                            {user.subscription?.status === 'active'
+                                ? 'Pro Plan — Unlimited'
+                                : `Free — ${keysThisMonth} / 200 keys`}
+                        </div>
+                    )}
+
+                    {/* Auth nav */}
+                    {user ? (
+                        <div className="relative">
+                            <button
+                                onClick={() => setProfileOpen(o => !o)}
+                                className="px-3 py-1 rounded hover:bg-gray-700 flex items-center gap-1"
+                            >
+                                Hi, {user.email!.split('@')[0]}
+                                <i className="fa-solid fa-chevron-down text-xs" />
+                            </button>
+                            {profileOpen && (
+                                <div className="absolute right-0 mt-2 w-40 bg-[#1f1f1f] border border-gray-700 rounded shadow-lg">
+                                    <Link
+                                        href="/profile"
+                                        className="block px-4 py-2 hover:bg-gray-800"
+                                    >
+                                        Profile
+                                    </Link>
+                                    <Link
+                                        href="/billing"
+                                        className="block px-4 py-2 hover:bg-gray-800"
+                                    >
+                                        Billing & Plan
+                                    </Link>
+                                    <button
+                                        onClick={() => auth.signOut()}
+                                        className="w-full text-left px-4 py-2 hover:bg-gray-800"
+                                    >
+                                        Logout
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <Link
+                            href="/login"
+                            className="px-4 py-2 bg-[#8B5CF6] text-white rounded hover:opacity-90"
+                        >
+                            Log In
+                        </Link>
+                    )}
                 </div>
             </header>
 
             {/* main */}
-            <main className="pt-24 pb-20 container mx-auto px-4 md:px-6">
+            <main className="pt-24 pb-20 mx-auto px-4 md:px-6 max-w-[1600px]">
                 <div className="flex flex-col lg:flex-row lg:space-x-6">
                     {/* ------------ upload / keys column ------------ */}
-                    <section className="w-full lg:w-7/12 mb-10 lg:mb-0">
+                    <section className="w-full lg:w-9/12 mb-10 lg:mb-0">
                         {/* mode switch */}
                         <ModeSwitcher mode={mode} setMode={setMode} />
 
                         {/* -----  file mode  ----- */}
                         {mode === 'file' && (
                             <>
-                                <DropZone onSelect={handleFileUpload} fileName={fileName} />
+                                <DropZone
+                                    onSelect={handleFileUpload}
+                                    fileName={fileName}
+                                    translationResult={translationResult}
+                                />
 
-                                {/* ---------------- JSON Editor ---------------- */}
-                                <div className="mt-6 w-full max-w-3xl mx-auto bg-[#191919]/80 backdrop-blur-sm rounded-xl border border-gray-800 overflow-hidden shadow-lg">
-                                    {/* top bar */}
-                                    <div className="flex items-center justify-between h-10 px-4 border-b border-gray-800">
-                                        <span className="text-sm text-gray-400 select-none">
-                                            Paste or edit your text here…
-                                        </span>
-                                        <span className="px-3 py-1 rounded-md bg-[#34384b] text-xs font-semibold text-gray-300 tracking-wider select-none">
-                                            JSON
-                                        </span>
-                                    </div>
-
-                                    {/* textarea */}
+                                {!translationResult && (
                                     <textarea
                                         value={jsonInput}
                                         onChange={e => setJsonInput(e.target.value)}
                                         spellCheck={false}
-                                        placeholder="{}"
-                                        className="w-full h-56 resize-none bg-transparent px-4 py-4 font-mono text-sm text-gray-100 focus:outline-none  placeholder-gray-500"
+                                        placeholder="Paste or edit your text here…"
+                                        className="w-full h-56 resize-none bg-transparent px-4 py-4 font-mono text-sm text-gray-100 focus:outline-none placeholder-gray-500"
                                     />
-                                </div>
+                                )}
+                                {translationResult && (
+                                    <div className="mt-[-1px] rounded-t-none rounded-b-xl border border-gray-700 bg-[#1b1b1b] shadow-lg overflow-hidden">
+                                        <div className="flex flex-col md:flex-row">
+                                            {/* Main: view content */}
+                                            <div className="flex flex-wrap items-center gap-2 mb-4">
+                                                {/* View mode tabs */}
+                                                <div className="flex gap-2 mb-4">
+                                                    {(['json', 'table'] as const).map(mode => (
+                                                        <button
+                                                            key={mode}
+                                                            onClick={() => setSelectedView(mode)}
+                                                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                                                                selectedView === mode
+                                                                    ? 'bg-[#8B5CF6] text-white'
+                                                                    : 'bg-[#1f1f1f] text-gray-300 hover:bg-[#2a2a2a]'
+                                                            }`}
+                                                        >
+                                                            {mode === 'json' ? 'JSON' : 'Table'}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                <div className="flex justify-end mb-2">
+                                                    <button
+                                                        onClick={() => setColorized(v => !v)}
+                                                        className="text-sm text-gray-300 hover:text-white bg-[#1f1f1f] border border-gray-700 px-3 py-1 rounded-md"
+                                                    >
+                                                        {colorized
+                                                            ? 'Disable Coloring'
+                                                            : 'Enable Coloring'}
+                                                    </button>
+                                                </div>
 
-                                {/* live preview (only first target language) */}
-                                {lastPayload && translationResult && lastTargetCodes.length > 0 && (
-                                    <TranslationPreview
-                                        original={lastPayload}
-                                        translated={translationResult[lastTargetCodes[0]] ?? {}}
-                                        targetLangCode={lastTargetCodes[0]}
-                                        targetShortcut={
-                                            LANGUAGE_OPTIONS.find(
-                                                l => l.code === lastTargetCodes[0],
-                                            )?.shortcut ?? lastTargetCodes[0]
-                                        }
-                                    />
+                                                {translationResult && selectedLangTab && (
+                                                    <div className="flex gap-2 mb-4">
+                                                        <button
+                                                            onClick={copyCurrent}
+                                                            className="px-3 py-1.5 rounded-md bg-[#1f1f1f] text-gray-200 hover:bg-[#2a2a2a] text-sm font-medium"
+                                                        >
+                                                            <i className="fa-solid fa-copy mr-1" />{' '}
+                                                            Copy
+                                                        </button>
+                                                        <button
+                                                            onClick={downloadCurrent}
+                                                            className="px-3 py-1.5 rounded-md bg-[#1f1f1f] text-gray-200 hover:bg-[#2a2a2a] text-sm font-medium"
+                                                        >
+                                                            <i className="fa-solid fa-download mr-1" />{' '}
+                                                            Download
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                {/* Display selected translation view */}
+                                                <div className="max-h-[400px] overflow-auto">
+                                                    {selectedView === 'json' && selectedLangTab && (
+                                                        <div className="bg-[#111111] p-4 rounded-lg border border-gray-700 overflow-auto">
+                                                            <pre
+                                                                className="font-mono whitespace-pre text-sm leading-relaxed"
+                                                                dangerouslySetInnerHTML={{
+                                                                    __html: colorized
+                                                                        ? highlightJson(
+                                                                              prettyJson(
+                                                                                  selectedLangTab ===
+                                                                                      'ALL'
+                                                                                      ? Object.fromEntries(
+                                                                                            Object.entries(
+                                                                                                translationResult ??
+                                                                                                    {},
+                                                                                            ).map(
+                                                                                                ([
+                                                                                                    langCode,
+                                                                                                    entries,
+                                                                                                ]) => [
+                                                                                                    langCode.slice(
+                                                                                                        0,
+                                                                                                        2,
+                                                                                                    ),
+                                                                                                    entries,
+                                                                                                ],
+                                                                                            ),
+                                                                                        )
+                                                                                      : translationResult[
+                                                                                            selectedLangTab
+                                                                                        ] ?? {},
+                                                                              ),
+                                                                          )
+                                                                        : prettyJson(
+                                                                              selectedLangTab ===
+                                                                                  'ALL'
+                                                                                  ? Object.fromEntries(
+                                                                                        Object.entries(
+                                                                                            translationResult ??
+                                                                                                {},
+                                                                                        ).map(
+                                                                                            ([
+                                                                                                langCode,
+                                                                                                entries,
+                                                                                            ]) => [
+                                                                                                langCode.slice(
+                                                                                                    0,
+                                                                                                    2,
+                                                                                                ),
+                                                                                                entries,
+                                                                                            ],
+                                                                                        ),
+                                                                                    )
+                                                                                  : translationResult[
+                                                                                        selectedLangTab
+                                                                                    ] ?? {},
+                                                                          ),
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    )}
+
+                                                    {selectedView === 'table' &&
+                                                        selectedLangTab && (
+                                                            <div className="overflow-x-auto bg-[#111111] p-4 rounded-lg border border-gray-700">
+                                                                <table className="w-full text-left text-sm text-gray-300">
+                                                                    <thead>
+                                                                        <tr>
+                                                                            <th className="py-2 px-4 border-b border-gray-600">
+                                                                                Key
+                                                                            </th>
+                                                                            <th className="py-2 px-4 border-b border-gray-600">
+                                                                                {selectedLangTab}
+                                                                            </th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        {Object.entries(
+                                                                            selectedLangTab ===
+                                                                                'ALL'
+                                                                                ? mergeAllTranslations(
+                                                                                      translationResult ??
+                                                                                          {},
+                                                                                  )
+                                                                                : translationResult[
+                                                                                      selectedLangTab
+                                                                                  ] ?? {},
+                                                                        ).map(([key, value]) => (
+                                                                            <tr key={key}>
+                                                                                <td className="py-1 px-4 border-b border-gray-800 text-orange-400">
+                                                                                    {key}
+                                                                                </td>
+                                                                                <td className="py-1 px-4 border-b border-gray-800 text-green-400">
+                                                                                    {value}
+                                                                                </td>
+                                                                            </tr>
+                                                                        ))}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        )}
+                                                </div>
+                                            </div>
+
+                                            {/* Vertical language tabs */}
+                                            <div className="flex flex-col gap-2 p-4 border-l border-gray-800">
+                                                <button
+                                                    onClick={() => setSelectedLangTab('ALL')}
+                                                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                                                        selectedLangTab === 'ALL'
+                                                            ? 'bg-[#8B5CF6] text-white'
+                                                            : 'bg-[#1f1f1f] text-gray-300 hover:bg-[#2a2a2a]'
+                                                    }`}
+                                                >
+                                                    ALL
+                                                </button>
+
+                                                {LANGUAGE_OPTIONS.filter(lang =>
+                                                    Object.keys(translationResult || {}).includes(
+                                                        lang.code,
+                                                    ),
+                                                ).map(lang => (
+                                                    <button
+                                                        key={lang.code}
+                                                        onClick={() =>
+                                                            setSelectedLangTab(lang.code)
+                                                        }
+                                                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                                                            selectedLangTab === lang.code
+                                                                ? 'bg-[#8B5CF6] text-white'
+                                                                : 'bg-[#1f1f1f] text-gray-300 hover:bg-[#2a2a2a]'
+                                                        }`}
+                                                    >
+                                                        {lang.shortcut}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
                                 )}
                             </>
                         )}
-
-                        {/* -----  keys mode  ----- */}
-                        {mode === 'keys' && <KeyTable rows={rows} setRows={setRows} />}
-
+                        {mode === 'keys' ? (
+                            <KeyValueContextInput
+                                onChange={rows => {
+                                    // convert rows into your internal format if needed
+                                    console.log('Updated:', rows);
+                                }}
+                            />
+                        ) : null}
                         {/* toggles */}
 
                         {/* Language selection info */}
                     </section>
 
                     {/* ------------ picker ------------ */}
-                    <aside className="w-full lg:w-5/12 h-fit sticky top-24">
-                        <div className="bg-[#191919]/80 backdrop-blur-sm rounded-xl p-6 border border-gray-800">
+                    <aside className="w-full lg:w-3/12 h-fit">
+                        <div className="bg-[#191919]/80 backdrop-blur-sm rounded-xl p-6 border border-gray-700">
                             {/* Lang limit info as a tab on top */}
                             <header className="flex justify-between items-center mb-6">
                                 <h3 className="text-xl font-medium">Choose target languages</h3>
@@ -257,7 +590,13 @@ export default function TranslatorPage() {
                                 </span>
                             </header>
 
-                            <LanguageGrid selected={selectedShortcuts} toggle={toggleLanguage} />
+                            <LanguageGrid
+                                selected={selectedShortcuts}
+                                toggle={toggleLanguage}
+                                availableLangCodes={lastTargetCodes}
+                                selectedPreviewLang={selectedPreviewLang}
+                                setSelectedPreviewLang={setSelectedPreviewLang}
+                            />
 
                             {langLimitInfo && (
                                 <div
@@ -299,8 +638,17 @@ export default function TranslatorPage() {
                                 onChange={setKeepOrder}
                             />
                         </div>
+                        {showPaywall && (
+                            <div className="p-4 mb-4 bg-yellow-800 text-yellow-100 rounded">
+                                You’ve reached your free‐tier limit of 200 keys this month.{' '}
+                                <button onClick={goPro} className="underline">
+                                    Upgrade to Pro
+                                </button>{' '}
+                                to continue translating.
+                            </div>
+                        )}
                         <div className="flex flex-col sm:flex-row gap-4 mt-4">
-                            <TranslateButton onClick={handleTranslate} loading={isTranslating} />
+                            <TranslateButton onClick={tryTranslate} loading={isTranslating} />
                             {/* <button
                                 onClick={handleReset}
                                 disabled={isTranslating}
@@ -309,7 +657,7 @@ export default function TranslatorPage() {
                                 <i className="fa-solid fa-rotate-left mr-2" />
                             </button> */}
                         </div>
-                        {/* … rest of the unchanged file … */}
+                        {/* Success message */}
                     </aside>
                 </div>
             </main>
@@ -326,28 +674,33 @@ const ModeSwitcher = ({
     setMode: React.Dispatch<React.SetStateAction<'file' | 'keys'>>;
 }) => (
     <div className="flex justify-center mb-10">
-        {/* outer pill */}
-        <div className="inline-flex w-full max-w-xl rounded-xl overflow-hidden shadow-lg">
-            {(['file', 'keys'] as const).map((m, idx) => {
+        <div className="inline-flex w-full max-w-xl gap-2 rounded-xl p-2 bg-[#0F0F0F] shadow-lg">
+            {(['file', 'keys'] as const).map(m => {
                 const active = mode === m;
                 return (
                     <button
                         key={m}
                         onClick={() => setMode(m)}
-                        className={`flex items-center gap-2 justify-center flex-1 py-4 font-semibold text-base transition-colors
-              ${active ? 'bg-[#22173d] text-white' : 'bg-[#0F0F0F] text-gray-200'}
-              cursor-pointer
-            `}
-                        style={{
-                            borderLeft: idx === 1 ? '1px solid #151515' : undefined,
-                        }}
+                        className={`flex flex-col items-center justify-center flex-1 px-3 py-3 rounded-lg border transition-all
+                            border-gray-700/50
+                            ${active ? 'bg-[#8B5CF6]/10 ring-2 ring-[#8B5CF6]' : 'bg-primary/50'}
+                            cursor-pointer
+                        `}
                     >
                         <i
                             className={`${
                                 m === 'file' ? 'fa-solid fa-file-arrow-up' : 'fa-solid fa-key'
-                            } text-lg ${active ? 'text-white' : 'text-gray-400'}`}
+                            } text-lg mb-1 ${active ? 'text-[#8B5CF6]' : 'text-gray-400'}`}
                         />
-                        {m === 'file' ? 'Translate File' : 'Translate Keys Only'}
+                        <span
+                            className="font-bold text-sm"
+                            style={{
+                                color: active ? '#8B5CF6' : '#d1d5db',
+                                fontWeight: active ? 800 : 600,
+                            }}
+                        >
+                            {m === 'file' ? 'File Upload' : 'Key Input'}
+                        </span>
                     </button>
                 );
             })}
@@ -358,8 +711,9 @@ const ModeSwitcher = ({
 interface DZProps {
     onSelect: (e: ChangeEvent<HTMLInputElement>) => void;
     fileName?: string | null;
+    translationResult?: Record<string, Record<string, string>> | null;
 }
-const DropZone: React.FC<DZProps> = ({ onSelect, fileName }) => {
+const DropZone: React.FC<DZProps> = ({ onSelect, fileName, translationResult }) => {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const [drag, setDrag] = useState(false);
     const dragRef = useRef(false);
@@ -515,7 +869,9 @@ const DropZone: React.FC<DZProps> = ({ onSelect, fileName }) => {
                 }
             }}
             htmlFor="file-upload"
-            className={`relative flex flex-col items-center justify-center h-60 mb-8 border-dashed rounded-xl cursor-pointer overflow-hidden transition-colors duration-200 ${
+            className={`relative flex flex-col items-center justify-center ${
+                translationResult ? 'h-20' : 'h-60'
+            } mb-8 border-dashed rounded-xl cursor-pointer overflow-hidden transition-colors duration-200 ${
                 drag
                     ? 'border-[#8B5CF6] bg-[#1a1333]/80'
                     : fileName
@@ -566,13 +922,15 @@ const DropZone: React.FC<DZProps> = ({ onSelect, fileName }) => {
                     <>
                         <p className="text-lg font-semibold">Drop your JSON file here</p>
                         <p className="text-gray-400 text-sm">or click to browse</p>
-                        <span
-                            className="mt-4 relative inline-flex items-center justify-center px-6 py-2
+                        {translationResult && (
+                            <span
+                                className="mt-4 relative inline-flex items-center justify-center px-6 py-2
                         bg-[#8B5CF6]/50 rounded-lg font-bold text-base border"
-                            style={{ color: '#8B5CF6', borderColor: '#a78bfa', borderWidth: 1 }}
-                        >
-                            Browse files
-                        </span>
+                                style={{ color: '#8B5CF6', borderColor: '#a78bfa', borderWidth: 1 }}
+                            >
+                                Browse files
+                            </span>
+                        )}
                     </>
                 )}
             </div>
@@ -587,84 +945,90 @@ const DropZone: React.FC<DZProps> = ({ onSelect, fileName }) => {
     );
 };
 
-const KeyTable = ({
-    rows,
-    setRows,
-}: {
-    rows: { key: string; value: string; context?: string }[];
-    setRows: React.Dispatch<
-        React.SetStateAction<{ key: string; value: string; context?: string }[]>
-    >;
-}) => {
-    const handleChange = (idx: number, field: 'key' | 'value' | 'context', val: string) => {
-        setRows(r => {
-            const nxt = [...r];
-            nxt[idx] = { ...nxt[idx], [field]: val };
-            return nxt;
-        });
-    };
+// const KeyTable = ({
+//     rows,
+//     setRows,
+// }: {
+//     rows: { key: string; value: string; context?: string }[];
+//     setRows: React.Dispatch<
+//         React.SetStateAction<{ key: string; value: string; context?: string }[]>
+//     >;
+// }) => {
+//     const handleChange = (idx: number, field: 'key' | 'value' | 'context', val: string) => {
+//         setRows(r => {
+//             const nxt = [...r];
+//             nxt[idx] = { ...nxt[idx], [field]: val };
+//             return nxt;
+//         });
+//     };
 
-    const addRow = () => setRows(r => [...r, { key: '', value: '', context: '' }]);
+//     const addRow = () => setRows(r => [...r, { key: '', value: '', context: '' }]);
 
-    const removeRow = (idx: number) => setRows(r => r.filter((_, i) => i !== idx));
+//     const removeRow = (idx: number) => setRows(r => r.filter((_, i) => i !== idx));
 
-    return (
-        <div className="bg-[#18103a]/80 border border-[#2d2250] rounded-2xl p-6 shadow-lg">
-            <table className="w-full text-sm">
-                <thead>
-                    <tr className="text-gray-400 border-b border-[#2d2250]">
-                        {['Key', 'Value', 'Context (opt.)', ''].map(h => (
-                            <th key={h} className="text-left pb-3 font-semibold">
-                                {h}
-                            </th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody>
-                    {rows.map((row, i) => (
-                        <tr key={i}>
-                            {(['key', 'value', 'context'] as const).map(col => (
-                                <td key={col} className="pr-2 py-2 align-top">
-                                    <input
-                                        value={row[col] ?? ''}
-                                        onChange={e => handleChange(i, col, e.target.value)}
-                                        className="w-full bg-[#221a3e] border border-[#3a2c67] rounded-lg px-3 py-2 text-gray-100 focus:border-[#8B5CF6] focus:ring-2 focus:ring-secondary/30 focus:outline-none placeholder-gray-500 shadow-sm"
-                                    />
-                                </td>
-                            ))}
-                            <td className="py-2 align-top">
-                                {rows.length > 1 && (
-                                    <button
-                                        onClick={() => removeRow(i)}
-                                        className="text-gray-500 hover:text-red-500 cursor-pointer"
-                                        title="Remove row"
-                                    >
-                                        <i className="fa-solid fa-xmark" />
-                                    </button>
-                                )}
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+//     return (
+//         <div className="bg-[#18103a]/80 border border-[#2d2250] rounded-2xl p-6 shadow-lg">
+//             <table className="w-full text-sm">
+//                 <thead>
+//                     <tr className="text-gray-400 border-b border-[#2d2250]">
+//                         {['Key', 'Value', 'Context (opt.)', ''].map(h => (
+//                             <th key={h} className="text-left pb-3 font-semibold">
+//                                 {h}
+//                             </th>
+//                         ))}
+//                     </tr>
+//                 </thead>
+//                 <tbody>
+//                     {rows.map((row, i) => (
+//                         <tr key={i}>
+//                             {(['key', 'value', 'context'] as const).map(col => (
+//                                 <td key={col} className="pr-2 py-2 align-top">
+//                                     <input
+//                                         value={row[col] ?? ''}
+//                                         onChange={e => handleChange(i, col, e.target.value)}
+//                                         className="w-full bg-[#221a3e] border border-[#3a2c67] rounded-lg px-3 py-2 text-gray-100 focus:border-[#8B5CF6] focus:ring-2 focus:ring-secondary/30 focus:outline-none placeholder-gray-500 shadow-sm"
+//                                     />
+//                                 </td>
+//                             ))}
+//                             <td className="py-2 align-top">
+//                                 {rows.length > 1 && (
+//                                     <button
+//                                         onClick={() => removeRow(i)}
+//                                         className="text-gray-500 hover:text-red-500 cursor-pointer"
+//                                         title="Remove row"
+//                                     >
+//                                         <i className="fa-solid fa-xmark" />
+//                                     </button>
+//                                 )}
+//                             </td>
+//                         </tr>
+//                     ))}
+//                 </tbody>
+//             </table>
 
-            <div className="flex justify-end mt-6">
-                <button
-                    onClick={addRow}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-secondary to-accent text-white font-semibold shadow-lg hover:opacity-90 transition cursor-pointer"
-                >
-                    <i className="fa-solid fa-plus" /> Add new key
-                </button>
-            </div>
-        </div>
-    );
-};
+//             <div className="flex justify-end mt-6">
+//                 <button
+//                     onClick={addRow}
+//                     className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-secondary to-accent text-white font-semibold shadow-lg hover:opacity-90 transition cursor-pointer"
+//                 >
+//                     <i className="fa-solid fa-plus" /> Add new key
+//                 </button>
+//             </div>
+//         </div>
+//     );
+// };
 const LanguageGrid = ({
     selected,
     toggle,
+    availableLangCodes,
+    selectedPreviewLang,
+    setSelectedPreviewLang,
 }: {
     selected: Set<string>;
     toggle: (sc: string) => void;
+    availableLangCodes?: string[];
+    selectedPreviewLang?: string | null;
+    setSelectedPreviewLang?: (code: string) => void;
 }) => {
     const [expanded, setExpanded] = useState(false);
     const [perRow, setPerRow] = useState(2);
@@ -682,37 +1046,38 @@ const LanguageGrid = ({
                 className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[400px] pr-2 p-2 overflow-y-scroll"
                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
-                {/* Hide scrollbar for Chrome, Safari and Opera */}
                 <style jsx>{`
                     div::-webkit-scrollbar {
                         display: none;
                     }
                 `}</style>
+
                 {LANGUAGE_OPTIONS.slice(0, visibleCount).map(lang => {
-                    const isSel = selected.has(lang.shortcut);
+                    const isSelected = selected.has(lang.shortcut);
+                    const isTranslated = availableLangCodes?.includes(lang.code);
+                    const isActive = selectedPreviewLang === lang.code;
+
                     return (
                         <button
                             key={lang.code}
-                            onClick={() => toggle(lang.shortcut)}
-                            className={`language-chip flex flex-col items-start px-3 py-2 rounded-lg border text-left transition-all
-                border-gray-700/50 bg-primary/50
-                ${
-                    isSel
-                        ? 'ring-2 ring-secondary border-secondary bg-secondary/10 bg-[#8B5CF6]/20'
-                        : ''
-                }
-                cursor-pointer
-              `}
-                            style={{
-                                boxShadow: isSel ? '0 0 0 1.5px #8B5CF6' : undefined,
-                                fontWeight: isSel ? 700 : 500,
+                            onClick={() => {
+                                toggle(lang.shortcut);
+                                if (isTranslated && setSelectedPreviewLang) {
+                                    setSelectedPreviewLang(lang.code);
+                                }
                             }}
+                            className={`flex flex-col items-start px-3 py-2 rounded-lg border text-left transition-all
+    border-gray-700/50
+    cursor-pointer
+    ${isSelected ? 'bg-[#8B5CF6]/10 ring-2 ring-[#8B5CF6]' : 'bg-primary/50'}
+    ${isActive ? 'ring-2 ring-[#8B5CF6]' : ''}
+`}
                         >
                             <span
-                                className={`font-bold ${isSel ? 'tracking-wide' : ''}`}
+                                className="font-bold"
                                 style={{
-                                    color: isSel ? '#8B5CF6' : '#d1d5db',
-                                    fontWeight: isSel ? 800 : 600,
+                                    color: isSelected ? '#8B5CF6' : '#d1d5db',
+                                    fontWeight: isSelected ? 800 : 600,
                                 }}
                             >
                                 {lang.shortcut}
@@ -722,6 +1087,7 @@ const LanguageGrid = ({
                     );
                 })}
             </div>
+
             <div className="flex flex-col items-end">
                 {!expanded && LANGUAGE_OPTIONS.length > visibleCount && (
                     <div className="mt-4">

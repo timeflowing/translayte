@@ -1,7 +1,7 @@
 'use client';
 
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { auth } from '@/app/firebaseClient';
+import { auth } from '../lib/firebaseClient';
 
 const GoogleLoginButton = () => {
     const handleLogin = async () => {

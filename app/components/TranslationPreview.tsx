@@ -38,8 +38,8 @@ export default function TranslationPreview({
     );
 
     return (
-        <>
-            <div className="rounded-xl border border-gray-700/70 bg-[#0d0d0f]/80 shadow-lg p-6 w-full">
+        <div className="w-[100vw] -mx-4 sm:-mx-8 px-4 sm:px-8 py-6">
+            <div className="rounded-xl border border-gray-700/70 bg-[#0d0d0f]/80 shadow-lg p-6">
                 {/* ---------- header ---------- */}
                 <header className="mb-4 flex justify-between items-center">
                     <span className="flex items-center text-sm font-semibold text-gray-400">
@@ -80,6 +80,6 @@ export default function TranslationPreview({
                     scrollbar-width: none; /* Firefox   */
                 }
             `}</style>
-        </>
+        </div>
     );
 }
