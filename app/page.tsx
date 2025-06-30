@@ -559,9 +559,11 @@ const LandingPage = () => {
                     />
                 </div>
                 <div className="text-center mt-12">
-                    <button className="btn-primary text-white font-medium px-8 py-4 rounded-full">
-                        Try it Free
-                    </button>
+                    <Link href="/translator">
+                        <button className="btn-primary text-white font-medium px-8 py-4 rounded-full">
+                            Try it Free
+                        </button>
+                    </Link>
                 </div>
             </Section>
 
@@ -738,15 +740,17 @@ const PricingCard: React.FC<PricingCardProps> = ({
         </ul>
 
         <div className="mt-auto">
-            <button
-                className={`w-full py-3 text-white text-sm font-semibold rounded-lg transition-all ${
-                    gradient
-                        ? 'bg-[#8B5CF6] hover:bg-[#a78bfa]'
-                        : 'border border-[#8B5CF6] hover:bg-[#8B5CF6]/10'
-                }`}
-            >
-                {price === '0' ? 'Get Started' : 'Upgrade to Pro'}
-            </button>
+            <Link href="/translator">
+                <button
+                    className={`w-full py-3 text-white text-sm font-semibold rounded-lg transition-all ${
+                        gradient
+                            ? 'bg-[#8B5CF6] hover:bg-[#a78bfa]'
+                            : 'border border-[#8B5CF6] hover:bg-[#8B5CF6]/10'
+                    }`}
+                >
+                    {price === '0' ? 'Get Started' : 'Upgrade to Pro'}
+                </button>
+            </Link>
         </div>
     </div>
 );

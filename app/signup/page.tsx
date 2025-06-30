@@ -35,7 +35,7 @@ const RegisterPage = () => {
             if (displayName.trim()) {
                 await updateProfile(userCredential.user, { displayName });
             }
-            router.replace('/translator'); // or wherever your dashboard/landing is
+            router.push('/translator'); // or wherever your dashboard/landing is
         } catch (err) {
             if (err && typeof err === 'object' && 'code' in err) {
                 const error = err as { code: string };

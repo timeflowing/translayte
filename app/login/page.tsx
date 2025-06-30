@@ -8,28 +8,31 @@ import GoogleLoginButton from '../utils/signInWithGoogle';
 import GitHubLoginButton from '../utils/singInWithGithub';
 import { auth } from '../lib/firebaseClient';
 import SynapseAnimation from '../utils/SynapseAnimation';
+import { useAuthState } from 'react-firebase-hooks/auth';
 
 const LoginPage: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const router = useRouter();
+    const [user, loading] = useAuthState(auth);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         try {
             await signInWithEmailAndPassword(auth, email, password);
-            window.location.href = '/translator';
+            router.push('/translator');
         } catch {
             setError('Login failed. Please check your email and password.');
         }
     };
 
     useEffect(() => {
-        if (auth.currentUser) window.location.href = '/translator';
-    }, [router]);
-
+        if (!loading && user) {
+            router.push('/translator');
+        }
+    }, [user, loading, router]);
     return (
         <div className="min-h-screen flex bg-gradient-to-br from-[#181428] to-[#101014]">
             {/* Left Side - Branding */}
