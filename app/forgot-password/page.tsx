@@ -24,7 +24,7 @@ const ForgotPasswordPage: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen flex bg-gradient-to-br from-[#181428] to-[#101014]">
+        <div className="min-h-screen flex bg-gradient-to-br">
             {/* Left Side - Branding */}
             <div className="w-1/2 min-h-screen flex flex-col justify-center items-center relative overflow-hidden px-12">
                 <SynapseAnimation className="absolute inset-0 w-full h-full -z-10" />
@@ -35,13 +35,11 @@ const ForgotPasswordPage: React.FC = () => {
                             <div className="w-5 h-5 bg-black rounded-[6px]" />
                         </div>
                         <span className="text-lg font-bold text-white tracking-wide">
-                            Translayte AI
+                            Translayte
                         </span>
                     </div>
                     {/* Title */}
-                    <h1 className="text-4xl font-bold text-white mb-2">
-                        Secure & Effortless Reset
-                    </h1>
+                    <h1 className="text-4xl font-bold text-white mb-2">Reset your password</h1>
                     <p className="text-gray-300 mb-8 max-w-lg">
                         Forgot your password? No worries! Enter your email to receive a secure
                         password reset link.
@@ -50,7 +48,7 @@ const ForgotPasswordPage: React.FC = () => {
                     <div className="grid grid-cols-2 gap-6 bg-[#191627] p-6 rounded-2xl shadow-lg w-full max-w-md">
                         <Feature
                             title="AI Translation"
-                            desc="Context-aware translations in 100+ languages"
+                            desc="Context-aware translations in 13+ languages"
                             icon="💡"
                         />
                         <Feature

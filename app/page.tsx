@@ -420,7 +420,7 @@ const LandingPage = () => {
                         React, i18next, Next.js, Vue, and more.
                     </FeatureCard>
                     <FeatureCard icon="fa-language" title="Step 2: Choose target languages">
-                        Pick from 30+ supported languages — context-aware AI ensures accuracy across
+                        Pick from 13+ supported languages — context-aware AI ensures accuracy across
                         phrases.
                     </FeatureCard>
                     <FeatureCard icon="fa-download" title="Step 3: Download translated JSON">
@@ -471,10 +471,7 @@ const LandingPage = () => {
                             'Compatible with popular frameworks.',
                         ],
                         ['Fast export to .json or .js', 'Get the format you need, instantly.'],
-                        [
-                            'All translation is done client-side',
-                            'Your data never leaves your browser.',
-                        ],
+                        ['No hidden fees', 'Transparent, flat pricing—no surprises.'],
                     ].map(([title, desc]) => (
                         <div key={title} className="flex items-start space-x-4">
                             <div className="bg-[#8B5CF6]/20 p-2 rounded-lg">
@@ -540,7 +537,7 @@ const LandingPage = () => {
                         name="Free Plan"
                         price="0"
                         features={[
-                            'Translate up to 3 files/month',
+                            'Translate up to 200 keys/month',
                             '2 target languages per file',
                             'No signup required',
                         ]}

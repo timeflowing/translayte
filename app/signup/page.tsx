@@ -62,7 +62,7 @@ const RegisterPage = () => {
                             <div className="w-5 h-5 bg-black rounded-[6px]" />
                         </div>
                         <span className="text-lg font-bold text-white tracking-wide">
-                            Translayte AI
+                            Translayte
                         </span>
                     </div>
                     {/* Title */}
@@ -75,7 +75,7 @@ const RegisterPage = () => {
                     <div className="grid grid-cols-2 gap-6 bg-[#191627] p-6 rounded-2xl shadow-lg w-full max-w-md">
                         <Feature
                             title="AI Translation"
-                            desc="Context-aware translations in 100+ languages"
+                            desc="Context-aware translations in 13+ languages"
                             icon="💡"
                         />
                         <Feature
