@@ -740,7 +740,7 @@ const PricingCard: React.FC<PricingCardProps> = ({
         </ul>
 
         <div className="mt-auto">
-            <Link href="/translator">
+            <Link href="/payment">
                 <button
                     className={`w-full py-3 text-white text-sm font-semibold rounded-lg transition-all ${
                         gradient
