@@ -16,7 +16,7 @@ const SynapseAnimation: React.FC<{ className?: string }> = ({ className = '' }) 
             canvas.height = window.innerHeight * dpr;
             canvas.style.width = window.innerWidth + 'px';
             canvas.style.height = window.innerHeight + 'px';
-            ctx?.setTransform(1, 0, 0, 1, 0, 0); // reset transform
+            ctx?.setTransform(1, 0, 0, 1, 0, 0);
             ctx?.scale(dpr, dpr);
         };
         resize();
@@ -24,8 +24,8 @@ const SynapseAnimation: React.FC<{ className?: string }> = ({ className = '' }) 
 
         /* ------------------------------ nodes --------------------------- */
         const isLargeScreen = window.innerWidth >= 768;
-        const NODE_COUNT = isLargeScreen ? 260 : 120;
-        const LINK_LIMIT = isLargeScreen ? 180 : 140;
+        const NODE_COUNT = isLargeScreen ? 520 : 240; // << DOUBLE NODES
+        const LINK_LIMIT = isLargeScreen ? 210 : 170; // << SLIGHTLY INCREASED LINKS
         const nodes = Array.from({ length: NODE_COUNT }, () => ({
             x: Math.random() * canvas.width,
             y: Math.random() * canvas.height,
@@ -37,7 +37,7 @@ const SynapseAnimation: React.FC<{ className?: string }> = ({ className = '' }) 
         /* ------------------------------ colours ------------------------- */
         const primary = [0x8b, 0x5c, 0xf6]; // #8B5CF6
         const accent = [0xa7, 0x8b, 0xfa]; // #A78BFA
-        let t = 0; // time for colour-lerp
+        let t = 0;
 
         const lerpChannel = (a: number, b: number, m: number) => Math.round(a + (b - a) * m);
         const rgba = (mix: number, alpha = 1) =>
@@ -58,14 +58,12 @@ const SynapseAnimation: React.FC<{ className?: string }> = ({ className = '' }) 
             if (!canvas || !ctx) return;
             rafRef.current = requestAnimationFrame(loop);
 
-            // colour-pulse (0→1→0)
             t += 0.003;
             const mix = Math.sin(t) * 0.5 + 0.5;
 
             ctx.fillStyle = 'rgba(15,15,15,0.55)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            /* move + draw nodes */
             nodes.forEach((n, idx) => {
                 const oscX = Math.sin(t * 0.15 + idx) * 0.045;
                 const oscY = Math.cos(t * 0.12 + idx) * 0.045;
@@ -73,24 +71,16 @@ const SynapseAnimation: React.FC<{ className?: string }> = ({ className = '' }) 
                 n.x += oscX + n.vx;
                 n.y += oscY + n.vy;
 
-                // --- wrap detection ---
                 const wrapped = n.x < 0 || n.x > canvas.width || n.y < 0 || n.y > canvas.height;
-
-                // wrap-around
                 if (n.x < 0) n.x = canvas.width;
                 if (n.x > canvas.width) n.x = 0;
                 if (n.y < 0) n.y = canvas.height;
                 if (n.y > canvas.height) n.y = 0;
-
-                // if wrapped, reset alpha to 0
                 if (wrapped) {
                     n.alpha = 0;
                 }
-
-                // gradual fade-in (max 1)
                 n.alpha = Math.min(1, (n.alpha ?? 1) + 0.01);
 
-                // --- mouse interaction ---
                 const dx = n.x - mouse.x;
                 const dy = n.y - mouse.y;
                 const md = Math.hypot(dx, dy);
@@ -99,19 +89,15 @@ const SynapseAnimation: React.FC<{ className?: string }> = ({ className = '' }) 
                     n.vx += (dx / md) * force;
                     n.vy += (dy / md) * force;
                 }
-
-                // damping
                 n.vx *= 0.98;
                 n.vy *= 0.98;
 
-                // draw node with fade-in alpha
                 ctx.fillStyle = rgba(mix, 0.9 * (n.alpha ?? 1));
                 ctx.beginPath();
                 ctx.arc(n.x, n.y, 2, 0, Math.PI * 2);
                 ctx.fill();
             });
 
-            /* draw links */
             ctx.lineWidth = 1;
             ctx.strokeStyle = rgba(mix, 0.35);
             for (let i = 0; i < nodes.length; i++) {
@@ -123,7 +109,7 @@ const SynapseAnimation: React.FC<{ className?: string }> = ({ className = '' }) 
                         ctx.globalAlpha =
                             ((1 - Math.sqrt(d) / LINK_LIMIT) *
                                 ((nodes[i].alpha ?? 1) + (nodes[j].alpha ?? 1))) /
-                            2; // blend by alpha
+                            2;
                         ctx.beginPath();
                         ctx.moveTo(nodes[i].x, nodes[i].y);
                         ctx.lineTo(nodes[j].x, nodes[j].y);
@@ -131,12 +117,10 @@ const SynapseAnimation: React.FC<{ className?: string }> = ({ className = '' }) 
                     }
                 }
             }
-
             ctx.globalAlpha = 1;
         };
         loop();
 
-        /* ------------------------------ cleanup ------------------------- */
         return () => {
             if (rafRef.current !== null) {
                 cancelAnimationFrame(rafRef.current);

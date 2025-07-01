@@ -51,9 +51,9 @@ const RegisterPage = () => {
     };
 
     return (
-        <div className="min-h-screen flex bg-gradient-to-br from-[#181428] to-[#101014]">
+        <div className="flex flex-col md:flex-row min-h-screen">
             {/* Left Side - Branding */}
-            <div className="w-1/2 min-h-screen flex flex-col justify-center items-center relative overflow-hidden px-12">
+            <div className="w-full md:w-1/2 min-h-[400px] md:min-h-screen flex flex-col justify-center items-center relative overflow-hidden px-8 md:px-12 bg-transparent">
                 <SynapseAnimation className="absolute inset-0 w-full h-full -z-10" />
                 <div className="flex flex-col gap-8 z-10">
                     {/* Logo */}
