@@ -36,12 +36,12 @@ const ProPage = () => {
                 functions,
                 'ext-firestore-stripe-payments-createCheckoutSession',
             );
-            const { data }: any = await createCheckoutSession({
+            const { data } = (await createCheckoutSession({
                 price: PRICE_ID,
                 success_url: window.location.origin + '/pro',
                 cancel_url: window.location.origin + '/pro',
                 // You can pass allow_promotion_codes: true if you want coupon codes
-            });
+            })) as { data: { id: string } };
             const stripe = await stripePromise;
             await stripe?.redirectToCheckout({ sessionId: data.id });
         } finally {
@@ -61,7 +61,8 @@ const ProPage = () => {
             const { data } = await createPortalLink({
                 returnUrl: window.location.origin + '/pro',
             });
-            window.location.assign(data.url);
+            const url = (data as { url: string }).url;
+            window.location.assign(url);
         } finally {
             setLoading(false);
         }
