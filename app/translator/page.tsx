@@ -10,25 +10,8 @@ import { doc, onSnapshot } from 'firebase/firestore';
 
 import Link from 'next/link';
 import KeyValueContextInput from '../components/KeyValueContextInput';
+import { LANGUAGE_OPTIONS } from '../languages';
 
-/* ---------------------------------------------------------------- data */
-const LANGUAGE_OPTIONS = [
-    { code: 'en_XX', name: 'English', shortcut: 'EN' },
-    { code: 'cs_CZ', name: 'Czech', shortcut: 'CS' },
-    { code: 'it_IT', name: 'Italian', shortcut: 'IT' },
-    { code: 'fr_XX', name: 'French', shortcut: 'FR' },
-    { code: 'de_DE', name: 'German', shortcut: 'DE' },
-    { code: 'es_XX', name: 'Spanish', shortcut: 'ES' },
-    { code: 'ru_RU', name: 'Russian', shortcut: 'RU' },
-    { code: 'zh_CN', name: 'Chinese', shortcut: 'ZH' },
-    { code: 'ar_AR', name: 'Arabic', shortcut: 'AR' },
-    { code: 'hi_IN', name: 'Hindi', shortcut: 'HI' },
-    { code: 'pl_PL', name: 'Polish', shortcut: 'PL' },
-    { code: 'pt_XX', name: 'Portuguese', shortcut: 'PT' },
-    { code: 'tr_TR', name: 'Turkish', shortcut: 'TR' },
-    { code: 'vi_VN', name: 'Vietnamese', shortcut: 'VI' },
-] as const;
-/* ---------------------------------------------------------------- page */
 export default function TranslatorPage() {
     /* ---------------- state */
     const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -204,28 +187,29 @@ export default function TranslatorPage() {
 
         setIsTranslating(true);
         try {
-            const translationsArr = await Promise.all(
-                targetCodes.map(async code => {
-                    try {
-                        const data = await translateBatch(payload, code, 'en_XX');
+            // Make a single API call for all languages
+            const translations = await translateBatch(payload, targetCodes, 'en_XX');
 
-                        /* ▼ flatten the nested object we get back from the server          */
-                        const flatData = flattenJson(data);
+            // The result is already in the format { langCode: { key: value } }
+            // We just need to flatten each language's result for display
+            const finalResult: Record<string, Record<string, string>> = {};
+            for (const langCode in translations) {
+                finalResult[langCode] = flattenJson(translations[langCode]);
+            }
 
-                        return [code, flatData] as const;
-                    } catch (e) {
-                        console.error(`[Translayte] ${code} failed:`, e);
-                        return [code, {}] as const;
-                    }
-                }),
-            );
-            setTranslationResult(Object.fromEntries(translationsArr));
-            // setLastPayload(payload);
+            setTranslationResult(finalResult);
             setLastTargetCodes(targetCodes);
             setSelectedLangTab(targetCodes[0] ?? null);
             setSelectedPreviewLang(targetCodes[0] ?? null);
         } catch (e) {
-            console.error('[Translayte] Unexpected failure:', e);
+            if (e instanceof Error && e.message === 'Quota exceeded') {
+                setShowPaywall(true);
+            } else {
+                console.error('[Translayte] Unexpected failure:', e);
+                alert(
+                    'An unexpected error occurred during translation. Please check the console for details.',
+                );
+            }
         } finally {
             setIsTranslating(false);
         }
