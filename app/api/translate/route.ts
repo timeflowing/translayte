@@ -1,6 +1,6 @@
 import { adminAuth, adminDB } from '../../lib/firebaseAdmin';
 import OpenAI from 'openai';
-import { FieldValue } from 'firebase-admin/firestore';
+
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
@@ -21,7 +21,7 @@ You are a localisation engine. Your task is to translate UI strings.
 type TranslationJson = { [key: string]: string | TranslationJson };
 
 // JSON validation and formatting helper
-function validateAndFormatJson(jsonString: string): { valid: boolean; data?: any; formatted?: string; error?: string } {
+function validateAndFormatJson(jsonString: string): { valid: boolean; data?: unknown; formatted?: string; error?: string } {
   try {
     // Try to parse the JSON
     const parsed = JSON.parse(jsonString);
@@ -34,7 +34,7 @@ function validateAndFormatJson(jsonString: string): { valid: boolean; data?: any
     };
   } catch (error) {
     // Try to fix common JSON issues
-    let fixedJson = jsonString
+    const fixedJson = jsonString
       .replace(/'/g, '"')                    // Replace single quotes with double quotes
       .replace(/([{,]\s*)(\w+):/g, '$1"$2":') // Add quotes around unquoted keys
       .replace(/,(\s*[}\]])/g, '$1')         // Remove trailing commas
@@ -48,7 +48,7 @@ function validateAndFormatJson(jsonString: string): { valid: boolean; data?: any
         data: parsed,
         formatted: JSON.stringify(parsed, null, 2)
       };
-    } catch (secondError) {
+    } catch {
       return {
         valid: false,
         error: `Invalid JSON format: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -123,8 +123,8 @@ export async function POST(req: Request) {
         );
       }
 
-      // Use the parsed data for translation
-      const finalJson = validation.data;
+      
+      
     }
 
     if (!json && !texts) {
