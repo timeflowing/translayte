@@ -15,7 +15,7 @@ if (!privateKey) {
 
 const sa: ServiceAccount = {
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
-  clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
+  clientEmail: process.env.NEXT_PUBLIC_FIREBASE_CLIENT_EMAIL!,
   privateKey: privateKey.replace(/\\n/g, '\n'),
 };
 
