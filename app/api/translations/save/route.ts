@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     
     await userRef.set({
       ...userData,
-      projectCount: (userData.projectCount || 0) + 1,
+      projectCount: (userData?.projectCount || 0) + 1,
       lastProjectCreated: new Date().toISOString()
     }, { merge: true });
     
