@@ -1,7 +1,17 @@
 import { NextRequest } from 'next/server';
 
-export async function POST(req: NextRequest, { params }: { params: { teamId: string } }) {
+interface Params {
+  teamId: string;
+}
+
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<Params> } // Changed: params is now a Promise
+) {
   try {
+    // Await the params
+    const { teamId } = await params;
+    
     const { adminAuth, adminDB } = await import('../../../../lib/firebaseAdmin');
     
     const authHeader = req.headers.get('authorization') || '';
@@ -12,85 +22,151 @@ export async function POST(req: NextRequest, { params }: { params: { teamId: str
     }
     
     const decoded = await adminAuth.verifyIdToken(idToken);
-    const { emails, role = 'member' } = await req.json();
+    const { email, role } = await req.json();
     
-    if (!Array.isArray(emails) || emails.length === 0) {
-      return new Response(JSON.stringify({ error: 'Email addresses are required' }), { status: 400 });
+    if (!email || !role) {
+      return new Response(JSON.stringify({ error: 'Email and role are required' }), { status: 400 });
     }
     
-    // Check if user has permission to invite
-    const teamDoc = await adminDB.collection('teams').doc(params.teamId).get();
+    // Check if user has permission to invite to this team
+    const teamDoc = await adminDB.collection('teams').doc(teamId).get();
+    
     if (!teamDoc.exists) {
       return new Response(JSON.stringify({ error: 'Team not found' }), { status: 404 });
     }
     
-    const membershipDoc = await adminDB
-      .collection('team_members')
-      .where('teamId', '==', params.teamId)
-      .where('userId', '==', decoded.uid)
-      .where('role', 'in', ['owner', 'admin'])
-      .get();
-    
-    if (membershipDoc.empty) {
-      return new Response(JSON.stringify({ error: 'Insufficient permissions' }), { status: 403 });
-    }
-    
-    // Check team member limits
     const teamData = teamDoc.data()!;
-    const currentMembersSnapshot = await adminDB
-      .collection('team_members')
-      .where('teamId', '==', params.teamId)
-      .where('status', '==', 'accepted')
-      .get();
     
-    if (teamData.settings.maxMembers !== -1 && 
-        currentMembersSnapshot.size + emails.length > teamData.settings.maxMembers) {
-      return new Response(JSON.stringify({ 
-        error: `Team member limit exceeded. Current plan allows ${teamData.settings.maxMembers} members.` 
-      }), { status: 400 });
-    }
-    
-    const invitations = [];
-    
-    for (const email of emails) {
-      // Check if user is already a member
-      const existingMember = await adminDB
+    // Check if user is team owner or admin
+    if (teamData.ownerId !== decoded.uid) {
+      const memberDoc = await adminDB
         .collection('team_members')
-        .where('teamId', '==', params.teamId)
-        .where('email', '==', email)
+        .where('teamId', '==', teamId)
+        .where('userId', '==', decoded.uid)
+        .where('role', 'in', ['admin', 'owner'])
         .get();
       
-      if (!existingMember.empty) {
-        continue; // Skip if already invited/member
+      if (memberDoc.empty) {
+        return new Response(JSON.stringify({ error: 'Insufficient permissions' }), { status: 403 });
       }
-      
-      const invitationData = {
-        teamId: params.teamId,
-        userId: '', // Will be filled when user accepts
-        email,
-        role,
-        invitedBy: decoded.uid,
-        invitedAt: new Date().toISOString(),
-        status: 'pending'
-      };
-      
-      const invitationRef = await adminDB.collection('team_members').add(invitationData);
-      
-      // TODO: Send email invitation
-      
-      invitations.push({
-        id: invitationRef.id,
-        email,
-        role
-      });
     }
     
-    return new Response(JSON.stringify({ invitations }), {
+    // Check if user is already a member
+    const existingMember = await adminDB
+      .collection('team_members')
+      .where('teamId', '==', teamId)
+      .where('email', '==', email)
+      .get();
+    
+    if (!existingMember.empty) {
+      return new Response(JSON.stringify({ error: 'User is already a team member' }), { status: 409 });
+    }
+    
+    // Create invitation
+    const invitationData = {
+      teamId,
+      email,
+      role,
+      invitedBy: decoded.uid,
+      invitedAt: new Date().toISOString(),
+      status: 'pending',
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
+    };
+    
+    const invitationRef = await adminDB.collection('team_invitations').add(invitationData);
+    
+    // TODO: Send email invitation
+    
+    return new Response(JSON.stringify({ 
+      message: 'Invitation sent successfully',
+      invitationId: invitationRef.id 
+    }), {
       headers: { 'Content-Type': 'application/json' }
     });
     
   } catch (error) {
-    console.error('Error inviting team members:', error);
+    console.error('Error inviting team member:', error);
+    return new Response(JSON.stringify({ error: 'Internal server error' }), { status: 500 });
+  }
+}
+
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<Params> }
+) {
+  try {
+    const { teamId } = await params;
+    
+    const { adminDB } = await import('../../../../lib/firebaseAdmin');
+    
+    const authHeader = req.headers.get('authorization') || '';
+    const idToken = authHeader.replace(/^Bearer\s+/i, '');
+    
+    if (!idToken) {
+      return new Response(JSON.stringify({ error: 'Missing authorization token' }), { status: 401 });
+    }
+    
+    
+    
+    // Get all pending invitations for this team
+    const invitations = await adminDB
+      .collection('team_invitations')
+      .where('teamId', '==', teamId)
+      .where('status', '==', 'pending')
+      .get();
+    
+    const invitationList = invitations.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    return new Response(JSON.stringify({ invitations: invitationList }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+  } catch (error) {
+    console.error('Error fetching team invitations:', error);
+    return new Response(JSON.stringify({ error: 'Internal server error' }), { status: 500 });
+  }
+}
+
+export async function DELETE(
+  req: NextRequest,
+  {  }: { params: Promise<Params> }
+) {
+  try {
+    
+    
+    const { adminAuth, adminDB } = await import('../../../../lib/firebaseAdmin');
+    
+    const authHeader = req.headers.get('authorization') || '';
+    const idToken = authHeader.replace(/^Bearer\s+/i, '');
+    
+    if (!idToken) {
+      return new Response(JSON.stringify({ error: 'Missing authorization token' }), { status: 401 });
+    }
+    
+    const decoded = await adminAuth.verifyIdToken(idToken);
+    const url = new URL(req.url);
+    const invitationId = url.searchParams.get('invitationId');
+    
+    if (!invitationId) {
+      return new Response(JSON.stringify({ error: 'Invitation ID is required' }), { status: 400 });
+    }
+    
+    // Cancel invitation
+    await adminDB.collection('team_invitations').doc(invitationId).update({
+      status: 'cancelled',
+      cancelledBy: decoded.uid,
+      cancelledAt: new Date().toISOString()
+    });
+    
+    return new Response(JSON.stringify({ message: 'Invitation cancelled' }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+  } catch (error) {
+    console.error('Error cancelling invitation:', error);
     return new Response(JSON.stringify({ error: 'Internal server error' }), { status: 500 });
   }
 }
