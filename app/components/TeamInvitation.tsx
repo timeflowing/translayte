@@ -13,7 +13,11 @@ export default function TeamInvitation({ teamId, onInviteSuccess }: TeamInvitati
     const [role, setRole] = useState<'member' | 'admin'>('member');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const { user } = useAuth();
+    interface FirebaseUser {
+        getIdToken: () => Promise<string>;
+        // add other properties if needed
+    }
+    const { user } = useAuth() as { user: FirebaseUser | null };
 
     const addEmailField = () => {
         setEmails([...emails, '']);

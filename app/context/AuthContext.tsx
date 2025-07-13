@@ -5,7 +5,7 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../lib/firebaseClient';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 export interface User {
-    getIdToken: any;
+    getIdToken: unknown;
     uid: string;
     firstName: string;
     lastName: string;
@@ -57,6 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         const [firstName, ...rest] = (authUser.displayName || '').split(' ');
                         const lastName = rest.join(' ');
                         const profile: User = {
+                            getIdToken: authUser.getIdToken, // Add this line
                             uid: authUser.uid,
                             displayName: authUser.displayName || '',
                             firstName,
