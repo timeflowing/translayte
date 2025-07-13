@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     
     const teamIds = membershipSnapshot.docs.map(doc => doc.data().teamId);
     
-    let teams: any[] = [];
+    let teams: unknown[] = [];
     if (teamIds.length > 0) {
       const teamsSnapshot = await adminDB
         .collection('teams')

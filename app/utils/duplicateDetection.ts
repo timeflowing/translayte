@@ -29,8 +29,8 @@ export function detectDuplicates(translations: Record<string, string>): Duplicat
   
   // Find duplicates (groups with more than one key)
   const duplicateGroups: DuplicateGroup[] = Object.entries(textToKeys)
-    .filter(([_, keys]) => keys.length > 1)
-    .map(([normalizedText, keys]) => {
+    .filter(([, keys]) => keys.length > 1)
+    .map(([, keys]) => {
       const originalText = translations[keys[0]];
       
       const commonWords = keys

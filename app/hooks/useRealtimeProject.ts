@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { doc, onSnapshot, updateDoc, getDoc, arrayUnion } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../lib/firebaseClient';
 import { Project, EditLock, SavedVersion } from '../types/collaboration';
 
 export function useRealtimeProject(projectId: string) {
   const [project, setProject] = useState<Project | null>(null);
-  const [editLocks, setEditLocks] = useState<EditLock[]>([]);
+  const [editLocks, ] = useState<EditLock[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -23,7 +23,7 @@ export function useRealtimeProject(projectId: string) {
         if (!data.translations) {
           data.translations = {};
         }
-        setProject({ id: doc.id, ...data });
+        setProject({ ...data, id: doc.id });
       } else {
         setError('Project not found');
       }

@@ -48,7 +48,7 @@ export default function LiveDuplicateVisualization({
                             <div className="flex items-center justify-between">
                                 <div className="flex-1">
                                     <div className="font-medium text-gray-900 truncate">
-                                        "{group.originalText}"
+                                        &quot;{group.originalText}&quot;
                                     </div>
                                     <div className="text-xs text-gray-500 mt-1">
                                         {group.count} occurrences:{' '}

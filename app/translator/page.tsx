@@ -14,20 +14,10 @@ import { LANGUAGE_OPTIONS } from '../languages';
 import { detectDuplicates, DuplicateAnalysis } from '../utils/duplicateDetection';
 import DuplicateWarning from '../components/DuplicateWarning';
 import RealtimeInputSection from '../components/RealtimeInputSection';
-import LiveDuplicateVisualization from '../components/LiveDuplicateVisualization';
 
 export default function TranslatorPage() {
     /* ---------------- state */
-    const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
 
-    const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        setJsonInput(e.target.value);
-        const el = textAreaRef.current;
-        if (el) {
-            el.style.height = 'auto';
-            el.style.height = `${el.scrollHeight}px`;
-        }
-    };
     const [profileOpen, setProfileOpen] = useState(false);
     const { user, loading: authLoading } = useAuth();
     console.log(user);
@@ -66,12 +56,9 @@ export default function TranslatorPage() {
         string,
         Record<string, string>
     > | null>(null);
-    const [duplicateAnalysis, setDuplicateAnalysis] = useState<DuplicateAnalysis | null>(null);
-    const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
-    const [processedTranslations, setProcessedTranslations] = useState<Record<
-        string,
-        string
-    > | null>(null);
+    const [duplicateAnalysis] = useState<DuplicateAnalysis | null>(null);
+    const [showDuplicateWarning] = useState(false);
+    const [processedTranslations] = useState<Record<string, string> | null>(null);
     const [realtimeDuplicates, setRealtimeDuplicates] = useState<DuplicateAnalysis | null>(null);
     /* ------------- helpers */
     const toggleLanguage = (shortcut: string) => {
@@ -1269,7 +1256,7 @@ const LanguageGrid = ({
                 {visibleLanguages.length === 0 && searchQuery ? (
                     <div className="col-span-full text-center py-8 text-gray-400">
                         <i className="fa-solid fa-search text-2xl mb-2 block" />
-                        <p>No languages match "{searchQuery}"</p>
+                        <p>No languages match &quot;{searchQuery}&quot;</p>
                         <button
                             onClick={clearSearch}
                             className="mt-2 text-[#8B5CF6] hover:text-[#9333ea] text-sm font-medium"
@@ -1378,10 +1365,28 @@ const Toggle: React.FC<ToggleProps> = ({ label, checked, onChange }) => (
 // function to analyze duplicates after parsing input
 const analyzeDuplicates = (translations: Record<string, string>) => {
     const analysis = detectDuplicates(translations);
-    setDuplicateAnalysis(analysis);
-    setShowDuplicateWarning(analysis.hasDuplicates);
+
     return analysis;
 };
+
+// flattenJson utility for parseInput
+type JsonValue = string | { [key: string]: JsonValue };
+function flattenJson(obj: JsonValue, res: Record<string, string> = {}): Record<string, string> {
+    if (typeof obj !== 'object' || obj === null) {
+        return res;
+    }
+
+    for (const key in obj) {
+        const val = obj[key];
+        if (typeof val === 'string') {
+            res[key] = val;
+        } else {
+            flattenJson(val, res); // no prefix nesting
+        }
+    }
+
+    return res;
+}
 
 // update parseInput function to include duplicate detection
 const parseInput = (input: string): Record<string, string> => {
@@ -1396,12 +1401,12 @@ const parseInput = (input: string): Record<string, string> => {
         const parsed = JSON.parse(trimmedInput);
 
         if (typeof parsed === 'object' && parsed !== null) {
-            const flattened = flattenObject(parsed);
+            const flattened = flattenJson(parsed);
             // Analyze duplicates after parsing
             analyzeDuplicates(flattened);
             return flattened;
         }
-    } catch (e) {
+    } catch {
         // Not valid JSON, try other formats
     }
 
@@ -1441,22 +1446,9 @@ const parseInput = (input: string): Record<string, string> => {
 };
 
 // handlers for duplicate warning
-const handleUnifyDuplicates = (unifiedTranslations: Record<string, string>) => {
-    setProcessedTranslations(unifiedTranslations);
-    setShowDuplicateWarning(false);
-
+const handleUnifyDuplicates = () => {
     // Update the input text area with unified content
-    const unifiedJson = JSON.stringify(unifiedTranslations, null, 2);
-    setInputText(unifiedJson);
-
     // Show success message
-    if (duplicateAnalysis) {
-        const savedCalls = duplicateAnalysis.potentialSavings;
-        // You can add a toast notification here
-        console.log(`Unified duplicates! Saved ~${savedCalls} API calls.`);
-    }
 };
 
-const handleDismissDuplicateWarning = () => {
-    setShowDuplicateWarning(false);
-};
+const handleDismissDuplicateWarning = () => {};

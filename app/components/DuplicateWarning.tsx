@@ -100,7 +100,7 @@ export default function DuplicateWarning({
                                 />
                                 <div className="flex-1">
                                     <div className="font-medium text-gray-900 mb-2">
-                                        "{group.originalText}"
+                                        &quot;{group.originalText}&quot;
                                     </div>
                                     <div className="text-sm text-gray-600 mb-2">
                                         Found in {group.count} keys: {group.keys.join(', ')}

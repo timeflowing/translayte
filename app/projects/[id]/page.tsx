@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { useAuthContext } from '../../context/AuthContext';
+
 import { useRealtimeProject } from '../../hooks/useRealtimeProject';
 import VersionHistory from '../../components/VersionHistory';
 
 export default function ProjectPage() {
     const params = useParams();
     const projectId = params.id as string;
-    const { user } = useAuthContext();
+
     const {
         project,
         loading,

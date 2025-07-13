@@ -1,7 +1,3 @@
-import { useEffect, useState } from 'react';
-import { doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
-import { db } from '../lib/firebaseClient';
-
 export interface Project {
   id: string;
   name: string;
