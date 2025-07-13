@@ -27,11 +27,11 @@ export function useRealtimeDuplicateDetection({
       if (typeof parsed === 'object' && parsed !== null) {
         // Flatten nested objects
         const flattened: Record<string, string> = {};
-        const flatten = (obj: any, prefix = '') => {
+        const flatten = (obj: Record<string, unknown>, prefix = '') => {
           Object.keys(obj).forEach(key => {
             const fullKey = prefix ? `${prefix}.${key}` : key;
             if (typeof obj[key] === 'object' && obj[key] !== null) {
-              flatten(obj[key], fullKey);
+              flatten(obj[key] as Record<string, unknown>, fullKey);
             } else {
               flattened[fullKey] = String(obj[key]);
             }
@@ -40,7 +40,7 @@ export function useRealtimeDuplicateDetection({
         flatten(parsed);
         return flattened;
       }
-    } catch (e) {
+    } catch {
       // Not valid JSON, try other formats
     }
 

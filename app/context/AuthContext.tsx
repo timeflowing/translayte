@@ -5,6 +5,7 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../lib/firebaseClient';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 export interface User {
+    getIdToken: any;
     uid: string;
     firstName: string;
     lastName: string;

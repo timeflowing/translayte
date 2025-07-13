@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuthContext } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 
 interface TeamInvitationProps {
     teamId: string;
@@ -13,7 +13,7 @@ export default function TeamInvitation({ teamId, onInviteSuccess }: TeamInvitati
     const [role, setRole] = useState<'member' | 'admin'>('member');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const { user } = useAuthContext();
+    const { user } = useAuth();
 
     const addEmailField = () => {
         setEmails([...emails, '']);
@@ -63,7 +63,6 @@ export default function TeamInvitation({ teamId, onInviteSuccess }: TeamInvitati
                 throw new Error(errorData.error || 'Failed to send invitations');
             }
 
-            const result = await response.json();
             setEmails(['']);
             onInviteSuccess();
         } catch (err) {
