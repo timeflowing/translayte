@@ -13,8 +13,7 @@ export async function translateBatch(
     }
 
     // Get fresh ID token
-    const idToken = await user.getIdToken(true); // Force refresh
-    
+    const idToken = await user.getIdToken(true); // Force refresh 
     console.log('[translateBatch] Sending request with token:', idToken.substring(0, 20) + '...');
 
     const response = await fetch('/api/translate', {

@@ -9,10 +9,7 @@ export async function POST(req: NextRequest) {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return new Response(
         JSON.stringify({ error: 'Authentication required' }), 
-        { 
-          status: 401,
-          headers: { 'Content-Type': 'application/json' }
-        }
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
       );
     }
     
@@ -21,15 +18,19 @@ export async function POST(req: NextRequest) {
     let decoded;
     try {
       decoded = await adminAuth.verifyIdToken(idToken);
-    } catch  {
-      // The error you're seeing happens before this, during admin SDK initialization.
-      // But if the token is invalid, this will catch it.
+    } catch (error) {
+      // Add detailed server-side logging for debugging in production
+      console.error("CRITICAL: Token verification failed.", {
+        // The error code tells you exactly what's wrong.
+        // Common codes: 'auth/id-token-expired', 'auth/argument-error'
+        errorCode: typeof error === 'object' && error !== null && 'code' in error ? (error as { code: string }).code : undefined,
+        errorMessage: (error as Error).message,
+      });
+
+      // Send a generic error to the client
       return new Response(
         JSON.stringify({ error: 'Invalid authentication token' }), 
-        { 
-          status: 401,
-          headers: { 'Content-Type': 'application/json' }
-        }
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
       );
     }
     
@@ -39,10 +40,7 @@ export async function POST(req: NextRequest) {
     if (!payload || !targetLanguages || targetLanguages.length === 0) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields' }), 
-        { 
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        }
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
@@ -56,20 +54,14 @@ export async function POST(req: NextRequest) {
     if (!isPro && keysThisMonth + keyCount > 200) {
       return new Response(
         JSON.stringify({ error: 'Quota exceeded. Please upgrade to continue.' }), 
-        { 
-          status: 429,
-          headers: { 'Content-Type': 'application/json' }
-        }
+        { status: 429, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
     if (!process.env.OPENAI_API_KEY) {
       return new Response(
         JSON.stringify({ error: 'Translation service is temporarily unavailable.' }), 
-        { 
-          status: 503,
-          headers: { 'Content-Type': 'application/json' }
-        }
+        { status: 503, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
@@ -107,14 +99,11 @@ export async function POST(req: NextRequest) {
       headers: { 'Content-Type': 'application/json' }
     });
     
-  } catch {
-    // This is the generic catch-all. The initialization error happens here.
+  } catch (error) {
+    console.error("Translate API CATCH_ALL Error:", error);
     return new Response(
       JSON.stringify({ error: 'An unexpected error occurred on the server.' }), 
-      { 
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      }
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
 }
