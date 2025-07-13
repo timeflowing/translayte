@@ -4,8 +4,9 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from '../lib/firebaseClient';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+
 export interface User {
-    getIdToken: unknown;
+    getIdToken: () => Promise<string>; // Fixed: should be a function that returns Promise<string>
     uid: string;
     firstName: string;
     lastName: string;
@@ -30,8 +31,8 @@ export interface User {
 }
 
 interface AuthContext {
-    user: User | null; // Your Firestore user profile
-    authUser: import('firebase/auth').User | null; // The Firebase Auth user object
+    user: User | null;
+    authUser: import('firebase/auth').User | null;
     loading: boolean;
 }
 
@@ -42,7 +43,7 @@ const AuthCtx = createContext<AuthContext>({
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-    const [authUser, loading] = useAuthState(auth); // Firebase Auth user
+    const [authUser, loading] = useAuthState(auth);
     const [user, setUser] = useState<User | null>(null);
 
     useEffect(() => {
@@ -51,13 +52,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             getDoc(userRef)
                 .then(snap => {
                     if (snap.exists()) {
-                        setUser(snap.data() as User); // <- your Firestore profile
+                        const userData = snap.data();
+                        // Merge Firebase Auth user methods with Firestore data
+                        setUser({
+                            ...userData,
+                            getIdToken: authUser.getIdToken.bind(authUser), // Bind the actual method
+                        } as User);
                     } else {
-                        // initialize the user document with some defaults
                         const [firstName, ...rest] = (authUser.displayName || '').split(' ');
                         const lastName = rest.join(' ');
                         const profile: User = {
-                            getIdToken: authUser.getIdToken, // Add this line
+                            getIdToken: authUser.getIdToken.bind(authUser), // Bind the actual method
                             uid: authUser.uid,
                             displayName: authUser.displayName || '',
                             firstName,
