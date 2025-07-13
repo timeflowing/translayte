@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAuthContext } from '../context/AuthContext';
+
 import Link from 'next/link';
+import { useAuth } from '../context/AuthContext';
 
 interface Project {
     id: string;
@@ -20,7 +21,7 @@ export default function ProjectsPage() {
         shared: [],
     });
     const [loading, setLoading] = useState(true);
-    const { user } = useAuthContext();
+    const { user } = useAuth();
 
     useEffect(() => {
         if (user) {
