@@ -1,31 +1,20 @@
 import { NextRequest } from 'next/server';
 
-interface Params {
-  userId: string;
-}
 
+
+// filepath: /Users/vojtechtomasek/Desktop/translayte/app/api/shares/[token]/route.ts
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<Params> }
+  { params }: { params: Promise<{ token: string }> }
 ) {
-  try {
-    const { userId } = await params;
-    
-    // Your logic here
-    return new Response(
-      JSON.stringify({ userId }),
-      {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      }
-    );
-  } catch {
-    return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      }
-    );
-  }
+  const { token } = await params;
+
+  // Your logic here
+  return new Response(
+    JSON.stringify({ token }),
+    {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    }
+  );
 }

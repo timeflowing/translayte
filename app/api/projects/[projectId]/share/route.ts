@@ -1,8 +1,18 @@
 import { NextRequest } from 'next/server';
 import { randomBytes } from 'crypto';
 
-export async function POST(req: NextRequest, { params }: { params: { projectId: string } }) {
+interface Params {
+  projectId: string;
+}
+
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<Params> } // Changed: params is now a Promise
+) {
   try {
+    // Await the params
+    const { projectId } = await params;
+    
     const { adminAuth, adminDB } = await import('../../../../lib/firebaseAdmin');
     
     const authHeader = req.headers.get('authorization') || '';
@@ -16,7 +26,7 @@ export async function POST(req: NextRequest, { params }: { params: { projectId: 
     const { permissions, expiresInHours, inviteEmails } = await req.json();
     
     // Check if user has permission to share this project
-    const projectDoc = await adminDB.collection('projects').doc(params.projectId).get();
+    const projectDoc = await adminDB.collection('projects').doc(projectId).get();
     
     if (!projectDoc.exists) {
       return new Response(JSON.stringify({ error: 'Project not found' }), { status: 404 });
@@ -28,7 +38,7 @@ export async function POST(req: NextRequest, { params }: { params: { projectId: 
       // Check if user is admin collaborator
       const collaboratorDoc = await adminDB
         .collection('project_collaborators')
-        .where('projectId', '==', params.projectId)
+        .where('projectId', '==', projectId)
         .where('userId', '==', decoded.uid)
         .where('role', 'in', ['admin', 'owner'])
         .get();
@@ -48,7 +58,7 @@ export async function POST(req: NextRequest, { params }: { params: { projectId: 
         : undefined;
       
       const shareData = {
-        projectId: params.projectId,
+        projectId,
         shareToken,
         permissions: permissions || 'view',
         expiresAt,
@@ -72,7 +82,7 @@ export async function POST(req: NextRequest, { params }: { params: { projectId: 
     if (inviteEmails && inviteEmails.length > 0) {
       for (const email of inviteEmails) {
         const collaboratorData = {
-          projectId: params.projectId,
+          projectId,
           userId: '', // Will be filled when user accepts
           email,
           role: permissions === 'edit' ? 'editor' : 'viewer',
@@ -100,5 +110,32 @@ export async function POST(req: NextRequest, { params }: { params: { projectId: 
   } catch (error) {
     console.error('Error sharing project:', error);
     return new Response(JSON.stringify({ error: 'Internal server error' }), { status: 500 });
+  }
+}
+
+// If you have other methods (GET, PUT, DELETE) in this file, fix them too:
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<Params> }
+) {
+  try {
+    const { projectId } = await params;
+    
+    // Your GET logic here
+    return new Response(
+      JSON.stringify({ projectId }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+  } catch (error) {
+    return new Response(
+      JSON.stringify({ error: 'Internal server error' }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
   }
 }
