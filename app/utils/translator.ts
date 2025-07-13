@@ -1,42 +1,70 @@
-import { auth } from "../lib/firebaseClient";
+import { auth } from '../lib/firebaseClient';
 
 export async function translateBatch(
-  entries: Record<string, string>,
-  targetLangCodes: string[], // Changed to accept an array of codes
-  sourceLangCode: string,
-) {
-  const user = auth.currentUser;
-  if (!user) throw new Error('Not signed in');
-
-  const idToken = await user.getIdToken();
-
-  const res = await fetch('/api/translate', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${idToken}`,
-    },
-    body: JSON.stringify({
-      json: entries,
-      from: sourceLangCode,
-      to: targetLangCodes, // Pass all target codes to the API
-    }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    console.error('[translateBatch] API error:', res.status, text);
-    // Check for quota error specifically to show a paywall
-    if (res.status === 429) {
-        const errorData = JSON.parse(text);
-        if (errorData.type === 'quota') {
-            throw new Error('Quota exceeded');
-        }
+  payload: Record<string, string>,
+  targetLanguages: string[],
+  sourceLanguage: string = 'en_XX'
+): Promise<Record<string, Record<string, string>>> {
+  try {
+    // Get current user and token
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('User not authenticated');
     }
-    throw new Error(text || res.statusText);
-  }
 
-  // The API returns { translation: { lang1: {...}, lang2: {...} } }
-  const { translation } = await res.json();
-  return translation as Record<string, Record<string, string>>;
+    // Get fresh ID token
+    const idToken = await user.getIdToken(true); // Force refresh
+    
+    console.log('[translateBatch] Sending request with token:', idToken.substring(0, 20) + '...');
+
+    const response = await fetch('/api/translate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${idToken}`, // Ensure Bearer prefix
+      },
+      body: JSON.stringify({
+        payload,
+        targetLanguages,
+        sourceLanguage,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[translateBatch] API error:', response.status, errorText);
+      
+      if (response.status === 401) {
+        // Try to refresh token and retry once
+        const freshToken = await user.getIdToken(true);
+        const retryResponse = await fetch('/api/translate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${freshToken}`,
+          },
+          body: JSON.stringify({
+            payload,
+            targetLanguages,
+            sourceLanguage,
+          }),
+        });
+        
+        if (!retryResponse.ok) {
+          const retryError = await retryResponse.text();
+          throw new Error(retryError);
+        }
+        
+        return await retryResponse.json();
+      }
+      
+      throw new Error(errorText);
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error('[translateBatch] Error:', error);
+    throw error;
+  }
 }

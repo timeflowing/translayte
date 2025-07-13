@@ -1,124 +1,135 @@
-"use client";
+'use client';
 
-import React, { useState } from "react";
-import Link from "next/link";
+import { useState, useEffect } from 'react';
+import { useAuthContext } from '../context/AuthContext';
+import Link from 'next/link';
 
 interface Project {
-  id: number;
-  name: string;
-  description: string;
-  lastUpdated: string;
+    id: string;
+    name: string;
+    description: string;
+    sourceLanguage: string;
+    targetLanguages: string[];
+    createdAt: string;
+    updatedAt: string;
 }
 
-const dummyProjects: Project[] = [
-  {
-    id: 1,
-    name: "Mobile App",
-    description: "Translation keys for mobile app",
-    lastUpdated: "2025-02-25",
-  },
-  {
-    id: 2,
-    name: "Web App",
-    description: "Translation keys for web application",
-    lastUpdated: "2025-02-20",
-  },
-  {
-    id: 3,
-    name: "Dashboard",
-    description: "Dashboard translations",
-    lastUpdated: "2025-02-18",
-  },
-];
+export default function ProjectsPage() {
+    const [projects, setProjects] = useState<{ owned: Project[]; shared: Project[] }>({
+        owned: [],
+        shared: [],
+    });
+    const [loading, setLoading] = useState(true);
+    const { user } = useAuthContext();
 
-const ProjectsPage: React.FC = () => {
-  const [projects] = useState<Project[]>(dummyProjects);
+    useEffect(() => {
+        if (user) {
+            loadProjects();
+        }
+    }, [user]);
 
-  return (
-    <div style={styles.container}>
-      <h1 style={styles.heading}>Your Projects</h1>
-      <Link href="/projects/new">
-        <text style={styles.createBtn}>+ Create New Project</text>
-      </Link>
-      <div style={styles.projectList}>
-        {projects.map((project) => (
-          <div key={project.id} style={styles.projectCard}>
-            <h3 style={styles.projectTitle}>{project.name}</h3>
-            <p style={styles.projectDesc}>{project.description}</p>
-            <p style={styles.projectDate}>
-              Last Updated: {project.lastUpdated}
-            </p>
-            <div style={styles.cardActions}>
-              <Link href={`/projects/${project.id}`}>
-                <text style={styles.actionBtn}>View</text>
-              </Link>
-              <Link href={`/projects/${project.id}/edit`}>
-                <text style={styles.actionBtn}>Edit</text>
-              </Link>
+    const loadProjects = async () => {
+        if (!user) return;
+
+        try {
+            const token = await user.getIdToken();
+            const response = await fetch('/api/projects', {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setProjects(data);
+            }
+        } catch (error) {
+            console.error('Failed to load projects:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
+        );
+    }
 
-const styles: { [key: string]: React.CSSProperties } = {
-  container: {
-    padding: "40px 20px",
-    maxWidth: "800px",
-    margin: "0 auto",
-  },
-  heading: {
-    fontSize: "2rem",
-    marginBottom: "20px",
-    textAlign: "center",
-  },
-  createBtn: {
-    display: "block",
-    width: "200px",
-    margin: "0 auto 30px",
-    padding: "10px",
-    backgroundColor: "#007BFF",
-    color: "#fff",
-    textAlign: "center",
-    borderRadius: "5px",
-    textDecoration: "none",
-  },
-  projectList: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "20px",
-  },
-  projectCard: {
-    border: "1px solid #eaeaea",
-    borderRadius: "8px",
-    padding: "20px",
-    backgroundColor: "#fff",
-  },
-  projectTitle: {
-    margin: "0 0 10px",
-  },
-  projectDesc: {
-    margin: "0 0 10px",
-    color: "#555",
-  },
-  projectDate: {
-    margin: "0 0 10px",
-    fontSize: "0.9rem",
-    color: "#888",
-  },
-  cardActions: {
-    display: "flex",
-    gap: "10px",
-  },
-  actionBtn: {
-    padding: "8px 16px",
-    backgroundColor: "#007BFF",
-    color: "#fff",
-    borderRadius: "5px",
-    textDecoration: "none",
-  },
-};
+    return (
+        <div className="min-h-screen bg-gray-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div className="flex items-center justify-between mb-8">
+                    <h1 className="text-2xl font-bold text-gray-900">Translation Projects</h1>
+                    <Link
+                        href="/"
+                        className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                    >
+                        New Translation
+                    </Link>
+                </div>
 
-export default ProjectsPage;
+                {/* Owned Projects */}
+                <div className="mb-8">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Your Projects</h2>
+                    {projects.owned.length === 0 ? (
+                        <div className="bg-white rounded-lg border p-8 text-center">
+                            <p className="text-gray-500">
+                                No projects yet. Create your first translation project!
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                            {projects.owned.map(project => (
+                                <ProjectCard key={project.id} project={project} />
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Shared Projects */}
+                {projects.shared.length > 0 && (
+                    <div>
+                        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                            Shared with You
+                        </h2>
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                            {projects.shared.map(project => (
+                                <ProjectCard key={project.id} project={project} isShared />
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function ProjectCard({ project, isShared = false }: { project: Project; isShared?: boolean }) {
+    return (
+        <Link href={`/projects/${project.id}`}>
+            <div className="bg-white rounded-lg border p-6 hover:shadow-md transition-shadow cursor-pointer">
+                <div className="flex items-start justify-between mb-3">
+                    <h3 className="font-semibold text-gray-900 truncate">{project.name}</h3>
+                    {isShared && (
+                        <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                            Shared
+                        </span>
+                    )}
+                </div>
+
+                {project.description && (
+                    <p className="text-gray-600 text-sm mb-3 line-clamp-2">{project.description}</p>
+                )}
+
+                <div className="text-xs text-gray-500 space-y-1">
+                    <p>Source: {project.sourceLanguage}</p>
+                    <p>Targets: {project.targetLanguages.join(', ')}</p>
+                    <p>Updated: {new Date(project.updatedAt).toLocaleDateString()}</p>
+                </div>
+            </div>
+        </Link>
+    );
+}

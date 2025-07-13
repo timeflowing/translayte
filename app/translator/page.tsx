@@ -11,6 +11,10 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import Link from 'next/link';
 import KeyValueContextInput from '../components/KeyValueContextInput';
 import { LANGUAGE_OPTIONS } from '../languages';
+import { detectDuplicates, DuplicateAnalysis } from '../utils/duplicateDetection';
+import DuplicateWarning from '../components/DuplicateWarning';
+import RealtimeInputSection from '../components/RealtimeInputSection';
+import LiveDuplicateVisualization from '../components/LiveDuplicateVisualization';
 
 export default function TranslatorPage() {
     /* ---------------- state */
@@ -62,6 +66,13 @@ export default function TranslatorPage() {
         string,
         Record<string, string>
     > | null>(null);
+    const [duplicateAnalysis, setDuplicateAnalysis] = useState<DuplicateAnalysis | null>(null);
+    const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+    const [processedTranslations, setProcessedTranslations] = useState<Record<
+        string,
+        string
+    > | null>(null);
+    const [realtimeDuplicates, setRealtimeDuplicates] = useState<DuplicateAnalysis | null>(null);
     /* ------------- helpers */
     const toggleLanguage = (shortcut: string) => {
         setSelectedShortcuts(prev => {
@@ -165,6 +176,13 @@ export default function TranslatorPage() {
 
         if (targetCodes.length === 0) return;
 
+        // Check if user is authenticated
+        if (!user) {
+            alert('Please log in to translate');
+            window.location.href = '/login';
+            return;
+        }
+
         /* ---- build payload ---- */
         const payload =
             mode === 'file'
@@ -187,6 +205,9 @@ export default function TranslatorPage() {
 
         setIsTranslating(true);
         try {
+            // Wait a moment to ensure Firebase auth is ready
+            await new Promise(resolve => setTimeout(resolve, 100));
+
             // Make a single API call for all languages
             const translations = await translateBatch(payload, targetCodes, 'en_XX');
 
@@ -202,13 +223,22 @@ export default function TranslatorPage() {
             setSelectedLangTab(targetCodes[0] ?? null);
             setSelectedPreviewLang(targetCodes[0] ?? null);
         } catch (e) {
-            if (e instanceof Error && e.message === 'Quota exceeded') {
-                setShowPaywall(true);
+            console.error('[Translayte] Translation error:', e);
+
+            if (e instanceof Error) {
+                if (e.message.includes('Quota exceeded') || e.message.includes('429')) {
+                    setShowPaywall(true);
+                } else if (
+                    e.message.includes('Invalid authorization token') ||
+                    e.message.includes('401')
+                ) {
+                    alert('Authentication error. Please log out and log back in.');
+                    auth.signOut();
+                } else {
+                    alert(`Translation failed: ${e.message}`);
+                }
             } else {
-                console.error('[Translayte] Unexpected failure:', e);
-                alert(
-                    'An unexpected error occurred during translation. Please check the console for details.',
-                );
+                alert('Translation failed. Please try again.');
             }
         } finally {
             setIsTranslating(false);
@@ -363,22 +393,40 @@ export default function TranslatorPage() {
                                 />
 
                                 {!translationResult && (
-                                    <textarea
-                                        ref={textAreaRef}
-                                        value={jsonInput}
-                                        onChange={handleTextareaChange}
-                                        spellCheck={false}
-                                        placeholder="Paste or edit your text here…"
-                                        className="w-full resize-none bg-[#18181b]/90 border border-[#312e81] rounded-xl px-4 py-4 font-mono text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#8B5CF6] placeholder-gray-500 shadow-lg transition selection:bg-violet-500 selection:text-white"
-                                        style={{
-                                            caretColor: '#8B5CF6',
-                                            minHeight: '144px',
-                                            boxShadow: '0 2px 12px 0 rgba(139,92,246,0.06)',
-                                            backdropFilter: 'blur(4px)',
-                                            transition: 'box-shadow 0.2s',
-                                        }}
-                                    />
+                                    <>
+                                        <RealtimeInputSection
+                                            inputText={jsonInput}
+                                            setInputText={setJsonInput}
+                                            onDuplicatesChange={setRealtimeDuplicates}
+                                        />
+
+                                        {/* Show duplicate warning */}
+                                        {realtimeDuplicates?.hasDuplicates && (
+                                            <DuplicateWarning
+                                                analysis={realtimeDuplicates}
+                                                onUnify={unifiedTranslations => {
+                                                    const unifiedJson = JSON.stringify(
+                                                        unifiedTranslations,
+                                                        null,
+                                                        2,
+                                                    );
+                                                    setJsonInput(unifiedJson);
+                                                    setRealtimeDuplicates(null);
+                                                }}
+                                                onDismiss={() => setRealtimeDuplicates(null)}
+                                                originalTranslations={(() => {
+                                                    try {
+                                                        const parsed = JSON.parse(jsonInput);
+                                                        return parsed;
+                                                    } catch {
+                                                        return {};
+                                                    }
+                                                })()}
+                                            />
+                                        )}
+                                    </>
                                 )}
+
                                 {translationResult && (
                                     <div className="mt-[-1px] rounded-t-none rounded-b-xl border border-gray-700 bg-[#1b1b1b] shadow-lg overflow-hidden">
                                         <div className="flex flex-col md:flex-row">
@@ -699,6 +747,15 @@ export default function TranslatorPage() {
                     </aside>
                 </div>
             </main>
+            {/* Duplicate Warning */}
+            {showDuplicateWarning && duplicateAnalysis && (
+                <DuplicateWarning
+                    analysis={duplicateAnalysis}
+                    onUnify={handleUnifyDuplicates}
+                    onDismiss={handleDismissDuplicateWarning}
+                    originalTranslations={processedTranslations || parseInput(jsonInput)}
+                />
+            )}
         </>
     );
 }
@@ -1075,19 +1132,132 @@ const LanguageGrid = ({
     setSelectedPreviewLang?: (code: string) => void;
 }) => {
     const [expanded, setExpanded] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
     const [perRow, setPerRow] = useState(2);
+    const searchInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (window.innerWidth >= 640) setPerRow(3);
         else setPerRow(2);
     }, []);
 
-    const visibleCount = expanded ? LANGUAGE_OPTIONS.length : perRow;
+    // Filter languages based on search query
+    const filteredLanguages = LANGUAGE_OPTIONS.filter(
+        lang =>
+            lang.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            lang.shortcut.toLowerCase().includes(searchQuery.toLowerCase()),
+    );
+
+    const visibleLanguages = expanded ? filteredLanguages : LANGUAGE_OPTIONS.slice(0, perRow);
+
+    const handleToggleExpanded = () => {
+        if (!expanded) {
+            setExpanded(true);
+            // Focus the search input after animation completes
+            setTimeout(() => {
+                searchInputRef.current?.focus();
+            }, 300);
+        } else {
+            setExpanded(false);
+            setSearchQuery('');
+        }
+    };
+
+    const clearSearch = () => {
+        setSearchQuery('');
+        searchInputRef.current?.focus();
+    };
 
     return (
         <div>
+            {/* Language Grid */}
+            <div className="flex flex-col items-end">
+                <div
+                    className={`w-full transition-all duration-300 ease-in-out ${
+                        expanded ? 'max-h-32 opacity-100' : 'max-h-12 opacity-100'
+                    }`}
+                >
+                    {expanded ? (
+                        /* Search Bar Mode */
+                        <div className="space-y-3">
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i className="fa-solid fa-search text-gray-400 text-sm" />
+                                </div>
+                                <input
+                                    ref={searchInputRef}
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={e => setSearchQuery(e.target.value)}
+                                    placeholder="Search languages..."
+                                    className="w-full pl-10 pr-10 py-2 bg-[#1f1f1f] border border-gray-600 rounded-lg text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8B5CF6] focus:border-transparent transition-all duration-200"
+                                />
+                                {searchQuery && (
+                                    <button
+                                        onClick={clearSearch}
+                                        className="absolute inset-y-0 right-10 pr-3 flex items-center text-gray-400 hover:text-gray-200 transition-colors"
+                                    >
+                                        <i className="fa-solid fa-times text-sm" />
+                                    </button>
+                                )}
+                                <button
+                                    onClick={handleToggleExpanded}
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-200 transition-colors"
+                                    title="Collapse"
+                                >
+                                    <i className="fa-solid fa-chevron-up text-sm" />
+                                </button>
+                            </div>
+
+                            {/* Search Results Info & Selected Count */}
+
+                            {/* Quick Filter Badges */}
+                            {searchQuery === '' && (
+                                <div className="flex flex-wrap gap-2">
+                                    <span className="text-xs text-gray-400 mr-1">Quick:</span>
+                                    {['Popular', 'European', 'Asian', 'African'].map(filter => (
+                                        <button
+                                            key={filter}
+                                            onClick={() => {
+                                                // Simple filter implementation - you can enhance this
+                                                const filterMap: { [key: string]: string } = {
+                                                    Popular: 'en',
+                                                    European: 'de',
+                                                    Asian: 'ja',
+                                                    African: 'ar',
+                                                };
+                                                setSearchQuery(filterMap[filter] || '');
+                                            }}
+                                            className="px-2 py-1 text-xs bg-gray-700 text-gray-300 rounded-full hover:bg-gray-600 transition-colors duration-200"
+                                        >
+                                            {filter}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        /* Show More Button Mode */
+                        LANGUAGE_OPTIONS.length > perRow && (
+                            <div className="flex items-center justify-between w-full">
+                                <button
+                                    className="flex items-center gap-2 px-4 py-2 text-[#8B5CF6] font-medium transition-all duration-200 text-sm cursor-pointer  rounded-lg group ml-auto"
+                                    onClick={handleToggleExpanded}
+                                >
+                                    <span>Show more</span>
+                                    <i className="fa-solid fa-chevron-down transition-transform duration-200 group-hover:translate-y-0.5" />
+                                </button>
+                            </div>
+                        )
+                    )}
+                </div>
+            </div>
             <div
-                className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[400px] pr-2 p-2 overflow-y-scroll"
+                className={`grid grid-cols-2 sm:grid-cols-3 gap-3 pr-2 p-2 transition-all duration-300 ${
+                    expanded
+                        ? 'max-h-[400px] overflow-y-scroll mb-4'
+                        : 'max-h-none overflow-visible mb-0'
+                }`}
                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
                 <style jsx>{`
@@ -1096,64 +1266,66 @@ const LanguageGrid = ({
                     }
                 `}</style>
 
-                {LANGUAGE_OPTIONS.slice(0, visibleCount).map(lang => {
-                    const isSelected = selected.has(lang.shortcut);
-                    const isTranslated = availableLangCodes?.includes(lang.code);
-                    const isActive = selectedPreviewLang === lang.code;
-
-                    return (
+                {visibleLanguages.length === 0 && searchQuery ? (
+                    <div className="col-span-full text-center py-8 text-gray-400">
+                        <i className="fa-solid fa-search text-2xl mb-2 block" />
+                        <p>No languages match "{searchQuery}"</p>
                         <button
-                            key={lang.code}
-                            onClick={() => {
-                                toggle(lang.shortcut);
-                                if (isTranslated && setSelectedPreviewLang) {
-                                    setSelectedPreviewLang(lang.code);
-                                }
-                            }}
-                            className={`flex flex-col items-start px-3 py-2 rounded-lg border text-left transition-all
-    border-gray-700/50
-    cursor-pointer
-    ${isSelected ? 'bg-[#8B5CF6]/10 ring-2 ring-[#8B5CF6]' : 'bg-primary/50'}
-    ${isActive ? 'ring-2 ring-[#8B5CF6]' : ''}
-`}
+                            onClick={clearSearch}
+                            className="mt-2 text-[#8B5CF6] hover:text-[#9333ea] text-sm font-medium"
                         >
-                            <span
-                                className="font-bold"
-                                style={{
-                                    color: isSelected ? '#8B5CF6' : '#d1d5db',
-                                    fontWeight: isSelected ? 800 : 600,
+                            Clear search
+                        </button>
+                    </div>
+                ) : (
+                    visibleLanguages.map(lang => {
+                        const isSelected = selected.has(lang.shortcut);
+                        const isTranslated = availableLangCodes?.includes(lang.code);
+                        const isActive = selectedPreviewLang === lang.code;
+
+                        return (
+                            <button
+                                key={lang.code}
+                                onClick={() => {
+                                    toggle(lang.shortcut);
+                                    if (isTranslated && setSelectedPreviewLang) {
+                                        setSelectedPreviewLang(lang.code);
+                                    }
                                 }}
+                                className={`relative flex flex-col items-start px-3 py-2 rounded-lg border text-left transition-all duration-200 transform hover:scale-105
+                                    border-gray-700/50 cursor-pointer
+                                    ${
+                                        isSelected
+                                            ? 'bg-[#8B5CF6]/10 ring-2 ring-[#8B5CF6] shadow-lg'
+                                            : 'bg-primary/50 hover:bg-primary/70'
+                                    }
+                                    ${isActive ? 'ring-2 ring-[#8B5CF6]' : ''}
+                                `}
                             >
-                                {lang.shortcut}
-                            </span>
-                            <span className="text-xs text-gray-400">{lang.name}</span>
-                        </button>
-                    );
-                })}
+                                <span
+                                    className="font-bold transition-colors duration-200"
+                                    style={{
+                                        color: isSelected ? '#8B5CF6' : '#d1d5db',
+                                        fontWeight: isSelected ? 800 : 600,
+                                    }}
+                                >
+                                    {lang.shortcut}
+                                </span>
+                                <span className="text-xs text-gray-400 transition-colors duration-200">
+                                    {lang.name}
+                                </span>
+                                {isTranslated && (
+                                    <div className="absolute top-1 right-1">
+                                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                                    </div>
+                                )}
+                            </button>
+                        );
+                    })
+                )}
             </div>
 
-            <div className="flex flex-col items-end">
-                {!expanded && LANGUAGE_OPTIONS.length > visibleCount && (
-                    <div className="mt-4">
-                        <button
-                            className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#8B5CF6]/20 text-[#8B5CF6] font-medium hover:bg-[#221a3e] transition text-sm cursor-pointer"
-                            onClick={() => setExpanded(true)}
-                        >
-                            <i className="fa-solid fa-chevron-down" /> More languages
-                        </button>
-                    </div>
-                )}
-                {expanded && LANGUAGE_OPTIONS.length > perRow && (
-                    <div className="mt-4">
-                        <button
-                            className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#8B5CF6]/20 text-[#8B5CF6] font-medium hover:bg-[#221a3e] transition text-sm cursor-pointer"
-                            onClick={() => setExpanded(false)}
-                        >
-                            <i className="fa-solid fa-chevron-up" /> Hide
-                        </button>
-                    </div>
-                )}
-            </div>
+            {/* Animated Search Bar / Toggle Area */}
         </div>
     );
 };
@@ -1201,3 +1373,90 @@ const Toggle: React.FC<ToggleProps> = ({ label, checked, onChange }) => (
         </span>
     </label>
 );
+
+/* --------------------- Duplicate Detection Logic --------------------- */
+// function to analyze duplicates after parsing input
+const analyzeDuplicates = (translations: Record<string, string>) => {
+    const analysis = detectDuplicates(translations);
+    setDuplicateAnalysis(analysis);
+    setShowDuplicateWarning(analysis.hasDuplicates);
+    return analysis;
+};
+
+// update parseInput function to include duplicate detection
+const parseInput = (input: string): Record<string, string> => {
+    const trimmedInput = input.trim();
+
+    if (!trimmedInput) {
+        return {};
+    }
+
+    try {
+        // Try parsing as JSON first
+        const parsed = JSON.parse(trimmedInput);
+
+        if (typeof parsed === 'object' && parsed !== null) {
+            const flattened = flattenObject(parsed);
+            // Analyze duplicates after parsing
+            analyzeDuplicates(flattened);
+            return flattened;
+        }
+    } catch (e) {
+        // Not valid JSON, try other formats
+    }
+
+    // Handle line-by-line format
+    const lines = trimmedInput.split('\n').filter(line => line.trim());
+    const result: Record<string, string> = {};
+
+    lines.forEach((line, index) => {
+        const trimmedLine = line.trim();
+        if (!trimmedLine) return;
+
+        const colonIndex = trimmedLine.indexOf(':');
+        const equalIndex = trimmedLine.indexOf('=');
+
+        if (colonIndex > 0 && (equalIndex === -1 || colonIndex < equalIndex)) {
+            const key = trimmedLine.substring(0, colonIndex).trim().replace(/['"]/g, '');
+            const value = trimmedLine
+                .substring(colonIndex + 1)
+                .trim()
+                .replace(/['"]/g, '');
+            result[key] = value;
+        } else if (equalIndex > 0) {
+            const key = trimmedLine.substring(0, equalIndex).trim().replace(/['"]/g, '');
+            const value = trimmedLine
+                .substring(equalIndex + 1)
+                .trim()
+                .replace(/['"]/g, '');
+            result[key] = value;
+        } else {
+            result[`text_${index + 1}`] = trimmedLine;
+        }
+    });
+
+    // Analyze duplicates
+    analyzeDuplicates(result);
+    return result;
+};
+
+// handlers for duplicate warning
+const handleUnifyDuplicates = (unifiedTranslations: Record<string, string>) => {
+    setProcessedTranslations(unifiedTranslations);
+    setShowDuplicateWarning(false);
+
+    // Update the input text area with unified content
+    const unifiedJson = JSON.stringify(unifiedTranslations, null, 2);
+    setInputText(unifiedJson);
+
+    // Show success message
+    if (duplicateAnalysis) {
+        const savedCalls = duplicateAnalysis.potentialSavings;
+        // You can add a toast notification here
+        console.log(`Unified duplicates! Saved ~${savedCalls} API calls.`);
+    }
+};
+
+const handleDismissDuplicateWarning = () => {
+    setShowDuplicateWarning(false);
+};
