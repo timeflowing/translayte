@@ -5,7 +5,7 @@ admin.initializeApp();
 
 const stripe = new Stripe(
   process.env.STRIPE_SECRET_KEY!,
-  {apiVersion: "2025-02-24.acacia"}
+  {apiVersion: "2024-06-20"}
 );
 
 // v2 API: region is now an option in the function config
