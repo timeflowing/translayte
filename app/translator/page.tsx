@@ -27,7 +27,7 @@ export default function TranslatorPage() {
     const [selectedShortcuts, setSelectedShortcuts] = useState<Set<string>>(
         new Set(['EN', 'IT', 'CS']),
     );
-    const [rows] = useState<{ key: string; value: string; context?: string }[]>([
+    const [rows, setRows] = useState<{ key: string; value: string; context?: string }[]>([
         { key: '', value: '', context: '' },
     ]);
     const [mode, setMode] = useState<'file' | 'keys'>('file');
@@ -638,9 +638,8 @@ export default function TranslatorPage() {
                         )}
                         {mode === 'keys' ? (
                             <KeyValueContextInput
-                                onChange={rows => {
-                                    // convert rows into your internal format if needed
-                                    console.log('Updated:', rows);
+                                onChange={newRows => {
+                                    setRows(newRows);
                                 }}
                             />
                         ) : null}
