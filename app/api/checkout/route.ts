@@ -7,7 +7,7 @@ export async function POST(request: Request) {
   try {
     // Initialize Stripe only at runtime
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-      apiVersion: "2025-02-24.acacia", // Use a stable API version
+      apiVersion: "2024-06-20", // Use a stable API version
     });
 
     const { priceId } = await request.json();
