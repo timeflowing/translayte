@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
       const completion = await client.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
-        temperature: 0.3,
+        temperature: 0.2,
       });
 
       const translatedText = completion.choices[0]?.message?.content?.trim();
