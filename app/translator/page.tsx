@@ -7,6 +7,8 @@ import { auth, db } from '../lib/firebaseClient';
 import { highlightJson, prettyJson } from '../utils/prettyJson';
 import { useAuth } from '../context/AuthContext';
 import { doc, onSnapshot } from 'firebase/firestore';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 import Link from 'next/link';
 import KeyValueContextInput from '../components/KeyValueContextInput';
@@ -27,7 +29,7 @@ export default function TranslatorPage() {
     const [selectedShortcuts, setSelectedShortcuts] = useState<Set<string>>(
         new Set(['EN', 'IT', 'CS']),
     );
-    const [rows, setRows] = useState<{ key: string; value: string; context?: string }[]>([
+    const [rows, setRows] = useState<{ key: string; value: string; context: string }[]>([
         { key: '', value: '', context: '' },
     ]);
     const [mode, setMode] = useState<'file' | 'keys'>('file');
@@ -46,6 +48,7 @@ export default function TranslatorPage() {
     // const [selectedTab, setSelectedTab] = useState<'json' | 'table'>('json');
     const [selectedView, setSelectedView] = useState<'json' | 'table' | 'all' | 'original'>('json');
     const [selectedLangTab, setSelectedLangTab] = useState<string | null>(null);
+    const [outputFormat, setOutputFormat] = useState<'standard' | 'unity'>('standard');
     /* misc */
     const [isTranslating, setIsTranslating] = useState(false);
     const [langLimitInfo, setLangLimitInfo] = useState<string | null>(null);
@@ -113,36 +116,75 @@ export default function TranslatorPage() {
 
         return res;
     }
+
+    const transformToUnityFormat = (result: Record<string, Record<string, string>> | null) => {
+        if (!result) return {};
+        const unityData: Record<string, Record<string, string>> = {};
+        Object.entries(result).forEach(([langCode, translations]) => {
+            const shortCode = langCode.slice(0, 2);
+            Object.entries(translations).forEach(([key, value]) => {
+                if (!unityData[key]) {
+                    unityData[key] = {};
+                }
+                unityData[key][shortCode] = value;
+            });
+        });
+        return unityData;
+    };
     /* ---------------------------------------------------------------- copy / download */
     const copyCurrent = () => {
         if (!translationResult || !selectedLangTab) return;
 
-        /* JSON object we are currently looking at */
-        const data =
-            selectedLangTab === 'ALL'
-                ? Object.fromEntries(
-                      Object.entries(translationResult).map(([code, obj]) => [
-                          code.slice(0, 2),
-                          obj,
-                      ]),
-                  )
-                : translationResult[selectedLangTab] ?? {};
+        let data: unknown;
+        if (outputFormat === 'unity') {
+            const dataToTransform =
+                selectedLangTab === 'ALL'
+                    ? translationResult
+                    : { [selectedLangTab]: translationResult[selectedLangTab] ?? {} };
+            data = transformToUnityFormat(dataToTransform);
+        } else {
+            data =
+                selectedLangTab === 'ALL'
+                    ? Object.fromEntries(
+                          Object.entries(translationResult).map(([code, obj]) => [
+                              code.slice(0, 2),
+                              obj,
+                          ]),
+                      )
+                    : translationResult[selectedLangTab] ?? {};
+        }
 
         navigator.clipboard.writeText(JSON.stringify(data, null, minify ? 0 : 2));
+        toast.success('Copied to clipboard!');
     };
 
     const downloadCurrent = () => {
         if (!translationResult || !selectedLangTab) return;
 
-        const data =
-            selectedLangTab === 'ALL'
-                ? Object.fromEntries(
-                      Object.entries(translationResult).map(([code, obj]) => [
-                          code.slice(0, 2),
-                          obj,
-                      ]),
-                  )
-                : translationResult[selectedLangTab] ?? {};
+        let data: unknown;
+        let downloadName: string;
+
+        if (outputFormat === 'unity') {
+            const dataToTransform =
+                selectedLangTab === 'ALL'
+                    ? translationResult
+                    : { [selectedLangTab]: translationResult[selectedLangTab] ?? {} };
+            data = transformToUnityFormat(dataToTransform);
+            downloadName =
+                selectedLangTab === 'ALL'
+                    ? 'translations_unity.json'
+                    : `translations_unity_${selectedLangTab.slice(0, 2)}.json`;
+        } else {
+            if (selectedLangTab === 'ALL') {
+                data = Object.fromEntries(
+                    Object.entries(translationResult).map(([code, obj]) => [code.slice(0, 2), obj]),
+                );
+                downloadName = 'translations.json';
+            } else {
+                data = translationResult[selectedLangTab] ?? {};
+                downloadName = `translations_${selectedLangTab.slice(0, 2)}.json`;
+            }
+        }
 
         const blob = new Blob([JSON.stringify(data, null, minify ? 0 : 2)], {
             type: 'application/json',
@@ -150,7 +192,7 @@ export default function TranslatorPage() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = selectedLangTab === 'ALL' ? 'translations.json' : `translations.json`;
+        a.download = downloadName;
         a.click();
         URL.revokeObjectURL(url);
     };
@@ -293,7 +335,6 @@ export default function TranslatorPage() {
         { key: 'json', label: 'JSON' },
         { key: 'table', label: 'Table' },
         { key: 'original', label: 'Original' },
-        { key: 'all', label: 'All' },
     ];
     return (
         <>
@@ -435,6 +476,7 @@ export default function TranslatorPage() {
                                                         </button>
                                                     ))}
                                                 </div>
+
                                                 <div className="flex justify-end mb-2">
                                                     <button
                                                         onClick={() => setColorized(v => !v)}
@@ -476,8 +518,22 @@ export default function TranslatorPage() {
                                                                             __html: colorized
                                                                                 ? highlightJson(
                                                                                       prettyJson(
-                                                                                          selectedLangTab ===
-                                                                                              'ALL'
+                                                                                          outputFormat ===
+                                                                                              'unity'
+                                                                                              ? transformToUnityFormat(
+                                                                                                    selectedLangTab ===
+                                                                                                        'ALL'
+                                                                                                        ? translationResult
+                                                                                                        : {
+                                                                                                              [selectedLangTab]:
+                                                                                                                  translationResult?.[
+                                                                                                                      selectedLangTab
+                                                                                                                  ] ??
+                                                                                                                  {},
+                                                                                                          },
+                                                                                                )
+                                                                                              : selectedLangTab ===
+                                                                                                'ALL'
                                                                                               ? Object.fromEntries(
                                                                                                     Object.entries(
                                                                                                         translationResult ??
@@ -495,15 +551,29 @@ export default function TranslatorPage() {
                                                                                                         ],
                                                                                                     ),
                                                                                                 )
-                                                                                              : translationResult[
+                                                                                              : translationResult?.[
                                                                                                     selectedLangTab
                                                                                                 ] ??
-                                                                                                    {},
+                                                                                                {},
                                                                                       ),
                                                                                   )
                                                                                 : prettyJson(
-                                                                                      selectedLangTab ===
-                                                                                          'ALL'
+                                                                                      outputFormat ===
+                                                                                          'unity'
+                                                                                          ? transformToUnityFormat(
+                                                                                                selectedLangTab ===
+                                                                                                    'ALL'
+                                                                                                    ? translationResult
+                                                                                                    : {
+                                                                                                          [selectedLangTab]:
+                                                                                                              translationResult?.[
+                                                                                                                  selectedLangTab
+                                                                                                              ] ??
+                                                                                                              {},
+                                                                                                      },
+                                                                                            )
+                                                                                          : selectedLangTab ===
+                                                                                            'ALL'
                                                                                           ? Object.fromEntries(
                                                                                                 Object.entries(
                                                                                                     translationResult ??
@@ -521,7 +591,7 @@ export default function TranslatorPage() {
                                                                                                     ],
                                                                                                 ),
                                                                                             )
-                                                                                          : translationResult[
+                                                                                          : translationResult?.[
                                                                                                 selectedLangTab
                                                                                             ] ?? {},
                                                                                   ),
@@ -536,25 +606,37 @@ export default function TranslatorPage() {
                                                                     <table className="w-full text-left text-sm text-gray-300">
                                                                         <thead>
                                                                             <tr>
-                                                                                <th className="py-2 px-4 border-b border-gray-600">
+                                                                                <th className="py-2 px-4 border-b border-gray-800 font-semibold">
                                                                                     Key
                                                                                 </th>
-                                                                                <th className="py-2 px-4 border-b border-gray-600">
-                                                                                    {
-                                                                                        selectedLangTab
-                                                                                    }
+                                                                                <th className="py-2 px-4 border-b border-gray-800 font-semibold">
+                                                                                    Translation
                                                                                 </th>
                                                                             </tr>
                                                                         </thead>
                                                                         <tbody>
                                                                             {Object.entries(
-                                                                                selectedLangTab ===
-                                                                                    'ALL'
+                                                                                outputFormat ===
+                                                                                    'unity'
+                                                                                    ? transformToUnityFormat(
+                                                                                          selectedLangTab ===
+                                                                                              'ALL'
+                                                                                              ? translationResult
+                                                                                              : {
+                                                                                                    [selectedLangTab]:
+                                                                                                        translationResult?.[
+                                                                                                            selectedLangTab
+                                                                                                        ] ??
+                                                                                                        {},
+                                                                                                },
+                                                                                      )
+                                                                                    : selectedLangTab ===
+                                                                                      'ALL'
                                                                                     ? mergeAllTranslations(
                                                                                           translationResult ??
                                                                                               {},
                                                                                       )
-                                                                                    : translationResult[
+                                                                                    : translationResult?.[
                                                                                           selectedLangTab
                                                                                       ] ?? {},
                                                                             ).map(
@@ -564,7 +646,12 @@ export default function TranslatorPage() {
                                                                                             {key}
                                                                                         </td>
                                                                                         <td className="py-1 px-4 border-b border-gray-800 text-green-400">
-                                                                                            {value}
+                                                                                            {typeof value ===
+                                                                                            'object'
+                                                                                                ? JSON.stringify(
+                                                                                                      value,
+                                                                                                  )
+                                                                                                : value}
                                                                                         </td>
                                                                                     </tr>
                                                                                 ),
@@ -638,6 +725,7 @@ export default function TranslatorPage() {
                         )}
                         {mode === 'keys' ? (
                             <KeyValueContextInput
+                                rows={rows}
                                 onChange={newRows => {
                                     setRows(newRows);
                                 }}
@@ -699,6 +787,31 @@ export default function TranslatorPage() {
                         </div>
                         {/* buttons */}
                         <div className="bg-[#191919]/70 backdrop-blur-sm rounded-lg p-4 mt-4 flex flex-col  gap-4">
+                            <div className="flex w-full items-center justify-between gap-4">
+                                <span className="text-sm text-gray-300">Output Format</span>
+                                <div className="flex items-center bg-[#0F0F0F] rounded-lg p-1 border border-gray-700">
+                                    <button
+                                        onClick={() => setOutputFormat('standard')}
+                                        className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                                            outputFormat === 'standard'
+                                                ? 'bg-purple-600 text-white'
+                                                : 'text-gray-400 hover:bg-gray-800'
+                                        }`}
+                                    >
+                                        Standard
+                                    </button>
+                                    <button
+                                        onClick={() => setOutputFormat('unity')}
+                                        className={`px-3 py-1 text-xs rounded-md transition-colors ${
+                                            outputFormat === 'unity'
+                                                ? 'bg-purple-600 text-white'
+                                                : 'text-gray-400 hover:bg-gray-800'
+                                        }`}
+                                    >
+                                        Unity
+                                    </button>
+                                </div>
+                            </div>
                             <Toggle
                                 label="Save translation"
                                 checked={minify}
@@ -1032,78 +1145,6 @@ const DropZone: React.FC<DZProps> = ({ onSelect, fileName, translationResult }) 
     );
 };
 
-// const KeyTable = ({
-//     rows,
-//     setRows,
-// }: {
-//     rows: { key: string; value: string; context?: string }[];
-//     setRows: React.Dispatch<
-//         React.SetStateAction<{ key: string; value: string; context?: string }[]>
-//     >;
-// }) => {
-//     const handleChange = (idx: number, field: 'key' | 'value' | 'context', val: string) => {
-//         setRows(r => {
-//             const nxt = [...r];
-//             nxt[idx] = { ...nxt[idx], [field]: val };
-//             return nxt;
-//         });
-//     };
-
-//     const addRow = () => setRows(r => [...r, { key: '', value: '', context: '' }]);
-
-//     const removeRow = (idx: number) => setRows(r => r.filter((_, i) => i !== idx));
-
-//     return (
-//         <div className="bg-[#18103a]/80 border border-[#2d2250] rounded-2xl p-6 shadow-lg">
-//             <table className="w-full text-sm">
-//                 <thead>
-//                     <tr className="text-gray-400 border-b border-[#2d2250]">
-//                         {['Key', 'Value', 'Context (opt.)', ''].map(h => (
-//                             <th key={h} className="text-left pb-3 font-semibold">
-//                                 {h}
-//                             </th>
-//                         ))}
-//                     </tr>
-//                 </thead>
-//                 <tbody>
-//                     {rows.map((row, i) => (
-//                         <tr key={i}>
-//                             {(['key', 'value', 'context'] as const).map(col => (
-//                                 <td key={col} className="pr-2 py-2 align-top">
-//                                     <input
-//                                         value={row[col] ?? ''}
-//                                         onChange={e => handleChange(i, col, e.target.value)}
-//                                         className="w-full bg-[#221a3e] border border-[#3a2c67] rounded-lg px-3 py-2 text-gray-100 focus:border-[#8B5CF6] focus:ring-2 focus:ring-secondary/30 focus:outline-none placeholder-gray-500 shadow-sm"
-//                                     />
-//                                 </td>
-//                             ))}
-//                             <td className="py-2 align-top">
-//                                 {rows.length > 1 && (
-//                                     <button
-//                                         onClick={() => removeRow(i)}
-//                                         className="text-gray-500 hover:text-red-500 cursor-pointer"
-//                                         title="Remove row"
-//                                     >
-//                                         <i className="fa-solid fa-xmark" />
-//                                     </button>
-//                                 )}
-//                             </td>
-//                         </tr>
-//                     ))}
-//                 </tbody>
-//             </table>
-
-//             <div className="flex justify-end mt-6">
-//                 <button
-//                     onClick={addRow}
-//                     className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-secondary to-accent text-white font-semibold shadow-lg hover:opacity-90 transition cursor-pointer"
-//                 >
-//                     <i className="fa-solid fa-plus" /> Add new key
-//                 </button>
-//             </div>
-//         </div>
-//     );
-// };
 const LanguageGrid = ({
     selected,
     toggle,

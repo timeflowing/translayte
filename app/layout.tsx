@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import localFont from 'next/font/local';
 import './globals.css';
+import './translayte.css';
 import { AuthProvider } from './context/AuthContext';
 
 const geistSans = localFont({

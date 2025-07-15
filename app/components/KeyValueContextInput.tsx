@@ -9,10 +9,12 @@ interface Entry {
 
 export default function KeyValueContextInput({
     onChange,
+    rows: initialRows,
 }: {
     onChange: (entries: Entry[]) => void;
+    rows: Entry[];
 }) {
-    const [rows, setRows] = useState<Entry[]>([{ key: '', value: '', context: '' }]);
+    const [rows, setRows] = useState<Entry[]>(initialRows);
 
     const updateRow = (index: number, field: keyof Entry, value: string) => {
         const newRows = [...rows];
