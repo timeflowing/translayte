@@ -544,7 +544,7 @@ const LandingPage = () => {
                     />
                     <PricingCard
                         name="Pro Plan"
-                        price="12"
+                        price="12.99"
                         popular
                         gradient
                         features={[

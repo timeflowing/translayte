@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface Entry {
     key: string;
@@ -21,6 +21,16 @@ export default function KeyValueContextInput({
         newRows[index][field] = value;
         setRows(newRows);
         onChange(newRows);
+
+        // If editing the last row and both key & value are filled, add a new row automatically
+        if (
+            index === newRows.length - 1 &&
+            field !== 'context' &&
+            newRows[index].key.trim() &&
+            newRows[index].value.trim()
+        ) {
+            setRows([...newRows, { key: '', value: '', context: '' }]);
+        }
     };
 
     const addRow = () => {
@@ -41,20 +51,21 @@ export default function KeyValueContextInput({
                         key={index}
                         className="flex flex-col md:flex-row items-start md:items-center gap-2"
                     >
+                        <span className="w-6 text-right text-gray-400 font-mono">{index + 1}.</span>
                         <input
-                            className="w-full md:w-1/3 bg-transparent border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-400"
+                            className="w-full md:w-1/3 focus:outline-none bg-transparent border border-gray-700/50 rounded px-3 py-2 text-white placeholder-gray-400 focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/40 transition"
                             placeholder="Key"
                             value={row.key}
                             onChange={e => updateRow(index, 'key', e.target.value)}
                         />
                         <input
-                            className="w-full md:w-1/3 bg-transparent border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-400"
+                            className="w-full md:w-1/3 focus:outline-none bg-transparent border border-gray-700/50 rounded px-3 py-2 text-white placeholder-gray-400 focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/40 transition"
                             placeholder="Value"
                             value={row.value}
                             onChange={e => updateRow(index, 'value', e.target.value)}
                         />
                         <input
-                            className="w-full md:w-1/3 bg-transparent border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-400"
+                            className="w-full md:w-1/3 focus:outline-none bg-transparent border border-gray-700/50 rounded px-3 py-2 text-white placeholder-gray-400 focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/40 transition"
                             placeholder="Context (optional)"
                             value={row.context}
                             onChange={e => updateRow(index, 'context', e.target.value)}

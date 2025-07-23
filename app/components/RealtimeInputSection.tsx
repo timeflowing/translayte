@@ -1,93 +1,31 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { detectDuplicates, DuplicateAnalysis } from '../utils/duplicateDetection';
+import { parseInput } from '../utils/inputParser';
 
 interface RealtimeInputSectionProps {
     inputText: string;
     setInputText: (text: string) => void;
-    onDuplicatesChange?: (analysis: DuplicateAnalysis | null) => void;
+    onDuplicatesChange: (analysis: DuplicateAnalysis | null) => void;
+    disabled?: boolean;
 }
 
-export default function RealtimeInputSection({
+const RealtimeInputSection: React.FC<RealtimeInputSectionProps> = ({
     inputText,
     setInputText,
     onDuplicatesChange,
-}: RealtimeInputSectionProps) {
+    disabled = false,
+}) => {
     const [duplicateAnalysis, setDuplicateAnalysis] = useState<DuplicateAnalysis | null>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-    const parseInput = (input: string): Record<string, string> => {
-        const trimmedInput = input.trim();
-
-        if (!trimmedInput) {
-            return {};
-        }
-
-        try {
-            const parsed = JSON.parse(trimmedInput);
-
-            if (typeof parsed === 'object' && parsed !== null) {
-                const flattened: Record<string, string> = {};
-                const flatten = (obj: Record<string, unknown>, prefix = '') => {
-                    Object.keys(obj).forEach(key => {
-                        const fullKey = prefix ? `${prefix}.${key}` : key;
-                        if (typeof obj[key] === 'object' && obj[key] !== null) {
-                            flatten(obj[key] as Record<string, unknown>, fullKey);
-                        } else {
-                            flattened[fullKey] = String(obj[key]);
-                        }
-                    });
-                };
-                flatten(parsed);
-                return flattened;
-            }
-        } catch {
-            // Not valid JSON
-        }
-
-        const lines = trimmedInput.split('\n').filter(line => line.trim());
-        const result: Record<string, string> = {};
-
-        lines.forEach((line, index) => {
-            const trimmedLine = line.trim();
-            if (!trimmedLine) return;
-
-            const colonIndex = trimmedLine.indexOf(':');
-            const equalIndex = trimmedLine.indexOf('=');
-
-            if (colonIndex > 0 && (equalIndex === -1 || colonIndex < equalIndex)) {
-                const key = trimmedLine.substring(0, colonIndex).trim().replace(/['"]/g, '');
-                const value = trimmedLine
-                    .substring(colonIndex + 1)
-                    .trim()
-                    .replace(/['"]/g, '');
-                if (key && value) {
-                    result[key] = value;
-                }
-            } else if (equalIndex > 0) {
-                const key = trimmedLine.substring(0, equalIndex).trim().replace(/['"]/g, '');
-                const value = trimmedLine
-                    .substring(equalIndex + 1)
-                    .trim()
-                    .replace(/['"]/g, '');
-                if (key && value) {
-                    result[key] = value;
-                }
-            } else {
-                result[`text_${index + 1}`] = trimmedLine;
-            }
-        });
-
-        return result;
-    };
 
     useEffect(() => {
         if (!inputText.trim()) {
             setDuplicateAnalysis(null);
             setIsAnalyzing(false);
-            onDuplicatesChange?.(null);
+            onDuplicatesChange(null);
             return;
         }
 
@@ -101,15 +39,15 @@ export default function RealtimeInputSection({
                 if (keyCount >= 2) {
                     const analysis = detectDuplicates(parsedTranslations);
                     setDuplicateAnalysis(analysis);
-                    onDuplicatesChange?.(analysis);
+                    onDuplicatesChange(analysis);
                 } else {
                     setDuplicateAnalysis(null);
-                    onDuplicatesChange?.(null);
+                    onDuplicatesChange(null);
                 }
             } catch (error) {
                 console.error('Error analyzing duplicates:', error);
                 setDuplicateAnalysis(null);
-                onDuplicatesChange?.(null);
+                onDuplicatesChange(null);
             } finally {
                 setIsAnalyzing(false);
             }
@@ -132,54 +70,27 @@ export default function RealtimeInputSection({
     const potentialSavings = duplicateAnalysis?.potentialSavings || 0;
 
     return (
-        <div className="relative">
-            {/* Real-time Status Bar */}
-            <div className="flex items-center justify-between mb-2 text-xs">
-                <div className="flex items-center gap-3">
-                    {isAnalyzing && (
-                        <div className="flex items-center gap-1 text-blue-400">
-                            <div className="animate-spin w-3 h-3 border border-blue-400 border-t-transparent rounded-full"></div>
-                            <span>Analyzing...</span>
-                        </div>
-                    )}
-
-                    {hasDuplicates && !isAnalyzing && (
-                        <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1 text-amber-500">
-                                <i className="fa-solid fa-exclamation-triangle" />
-                                <span>
-                                    {duplicateCount} duplicate{duplicateCount !== 1 ? 's' : ''}
-                                </span>
-                            </div>
-                            <div className="text-green-400">
-                                ~{potentialSavings} API calls could be saved
-                            </div>
-                        </div>
-                    )}
-
-                    {!hasDuplicates && !isAnalyzing && inputText.trim() && (
-                        <div className="text-green-400 flex items-center gap-1">
-                            <i className="fa-solid fa-check-circle" />
-                            <span>No duplicates detected</span>
-                        </div>
-                    )}
-                </div>
+        <div className="flex flex-col h-[480px] bg-[#1b1b1b] rounded-xl border border-gray-700/80 shadow-lg overflow-hidden">
+            <div className="flex-shrink-0 px-5 py-3 border-b border-gray-800 bg-[#0F0F0F]/50">
+                <h3 className="text-base font-semibold text-white">Source Content</h3>
+                <p className="text-sm text-gray-400">
+                    Paste your JSON, key-value pairs, or plain text below.
+                </p>
             </div>
-
-            {/* Text Input */}
-            <div className="relative">
+            <div className="relative flex-grow">
                 <textarea
                     ref={textareaRef}
                     value={inputText}
                     onChange={handleTextareaChange}
+                    disabled={disabled}
                     spellCheck={false}
-                    placeholder="Paste or edit your text here…"
-                    className={`w-full resize-none bg-[#18181b]/90 border rounded-xl px-4 py-4 font-mono text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#8B5CF6] placeholder-gray-500 shadow-lg transition selection:bg-violet-500 selection:text-white ${
+                    placeholder={`{\n  "welcome_message": "Hello, World!",\n  "buttons": {\n    "submit": "Submit"\n  }\n}`}
+                    className={`w-full h-full p-4 bg-transparent text-gray-300 placeholder-gray-500 resize-none focus:outline-none font-mono text-sm leading-relaxed ${
                         hasDuplicates ? 'border-amber-400' : 'border-[#312e81]'
                     }`}
                     style={{
                         caretColor: '#8B5CF6',
-                        minHeight: '144px',
+                        minHeight: '320px',
                         boxShadow: '0 2px 12px 0 rgba(139,92,246,0.06)',
                         backdropFilter: 'blur(4px)',
                         transition: 'box-shadow 0.2s, border-color 0.2s',
@@ -214,4 +125,6 @@ export default function RealtimeInputSection({
             </div>
         </div>
     );
-}
+};
+
+export default RealtimeInputSection;

@@ -64,3 +64,16 @@ html,body { -ms-overflow-style:none; scrollbar-width:none; }
 .animate-ping-once {
   animation: ping-once 1s ease-out;
 }
+
+/* Custom Selection and Caret Color */
+::selection {
+    background-color: #8B5CF6;
+    color: #ffffff;
+}
+
+textarea,
+input[type='text'],
+input[type='email'],
+input[type='password'] {
+    caret-color: #8B5CF6;
+}

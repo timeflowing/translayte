@@ -1,8 +1,7 @@
 'use client';
-
 import React from 'react';
 
-export const ModeSwitcher = ({
+const ModeSwitcher = ({
     mode,
     setMode,
 }: {
@@ -17,16 +16,16 @@ export const ModeSwitcher = ({
                     <button
                         key={m}
                         onClick={() => setMode(m)}
-                        className={`flex flex-col items-center justify-center flex-1 px-3 py-3 rounded-lg border transition-all
-                            border-gray-700/50
-                            ${active ? 'bg-[#8B5CF6]/10 ring-2 ring-[#8B5CF6]' : 'bg-primary/50'}
-                            cursor-pointer
-                        `}
+                        className={`flex flex-col items-center justify-center flex-1 px-3 py-3 rounded-lg border transition-all border-gray-700/50 ${
+                            active ? 'bg-[#8B5CF6]/10 ring-2 ring-[#8B5CF6]' : 'bg-primary/50'
+                        } cursor-pointer`}
                     >
                         <i
-                            className={`${
-                                m === 'file' ? 'fa-solid fa-file-arrow-up' : 'fa-solid fa-key'
-                            } text-lg mb-1 ${active ? 'text-[#8B5CF6]' : 'text-gray-400'}`}
+                            className={
+                                (m === 'file' ? 'fa-solid fa-file-arrow-up' : 'fa-solid fa-key') +
+                                ' text-lg mb-1 ' +
+                                (active ? 'text-[#8B5CF6]' : 'text-gray-400')
+                            }
                         />
                         <span
                             className="font-bold text-sm"
@@ -43,3 +42,5 @@ export const ModeSwitcher = ({
         </div>
     </div>
 );
+
+export default ModeSwitcher;

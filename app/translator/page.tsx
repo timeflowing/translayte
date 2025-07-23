@@ -1,31 +1,58 @@
 'use client';
-import React, { useRef, useState, ChangeEvent, useEffect } from 'react';
+import React, { useState, ChangeEvent, useEffect } from 'react';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import '../translayte.css';
 import { translateBatch } from '../utils/translator';
 import { auth, db } from '../lib/firebaseClient';
 import { highlightJson, prettyJson } from '../utils/prettyJson';
 import { useAuth } from '../context/AuthContext';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { toast } from 'react-toastify';
+import {
+    doc,
+    onSnapshot,
+    addDoc,
+    collection,
+    serverTimestamp,
+    setDoc,
+    deleteDoc,
+    updateDoc,
+} from 'firebase/firestore';
 import 'react-toastify/dist/ReactToastify.css';
 
 import Link from 'next/link';
 import KeyValueContextInput from '../components/KeyValueContextInput';
 import { LANGUAGE_OPTIONS } from '../languages';
-import { detectDuplicates, DuplicateAnalysis } from '../utils/duplicateDetection';
+import { DuplicateAnalysis } from '../utils/duplicateDetection';
 import DuplicateWarning from '../components/DuplicateWarning';
 import RealtimeInputSection from '../components/RealtimeInputSection';
+import { LanguageGrid } from '../components/LanguageGrid';
+import { HistoryAside } from '../components/HistoryAside'; // Import the new component
+import { toast } from 'react-toastify';
+import ModeSwitcher from '../components/ModeSwitcher';
+import { DropZone } from '../components/DropZone';
+import { parseInput } from '../utils/inputParser';
+
+type TranslationHistoryItem = {
+    id: string;
+    userId?: string;
+    fileName?: string;
+    targetLanguages?: string[];
+    translationResult?: Record<string, Record<string, string>>;
+    createdAt?: { seconds: number; nanoseconds: number };
+    [key: string]: unknown;
+};
 
 export default function TranslatorPage() {
     /* ---------------- state */
 
     const [profileOpen, setProfileOpen] = useState(false);
     const { user, loading: authLoading } = useAuth();
-    console.log(user);
+    // console.log(user.subscription);
     const [keysThisMonth, setKeysThisMonth] = useState(0);
     const [showPaywall, setShowPaywall] = useState(false);
-    const isPro = user?.subscription?.status === 'active';
+    // const isPro = user?.subscription?.status === 'active';
+    const [translationId] = useState<string | null>(null);
+    const isPro = true;
+    console.log(user?.uid);
     const [selectedShortcuts, setSelectedShortcuts] = useState<Set<string>>(
         new Set(['EN', 'IT', 'CS']),
     );
@@ -33,8 +60,8 @@ export default function TranslatorPage() {
         { key: '', value: '', context: '' },
     ]);
     const [mode, setMode] = useState<'file' | 'keys'>('file');
-    const [keepOrder, setKeepOrder] = useState(true);
-    const [minify, setMinify] = useState(false);
+
+    const [minify] = useState(false);
     // const [lastPayload, setLastPayload] = useState<Record<string, string> | null>(null);
     const [lastTargetCodes, setLastTargetCodes] = useState<string[]>([]);
     /* key-value mode */
@@ -53,16 +80,52 @@ export default function TranslatorPage() {
     const [isTranslating, setIsTranslating] = useState(false);
     const [langLimitInfo, setLangLimitInfo] = useState<string | null>(null);
     const [fileName, setFileName] = useState<string | null>(null);
+    const [, setTranslationTitle] = useState<string>('Untitled Translation');
     const [selectedPreviewLang, setSelectedPreviewLang] = React.useState<string | null>(null);
     /* ---------- translation result (⚠️ FLAT) ---------- */
     const [translationResult, setTranslationResult] = useState<Record<
         string,
         Record<string, string>
     > | null>(null);
-    const [duplicateAnalysis] = useState<DuplicateAnalysis | null>(null);
-    const [showDuplicateWarning] = useState(false);
-    const [processedTranslations] = useState<Record<string, string> | null>(null);
     const [realtimeDuplicates, setRealtimeDuplicates] = useState<DuplicateAnalysis | null>(null);
+    /* ------------- history */
+    const [history, setHistory] = useState<TranslationHistoryItem[]>([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const [isUserTranslation, setIsUserTranslation] = useState(false);
+
+    const handleUpdateTitle = async (id: string, newTitle: string) => {
+        try {
+            const docRef = doc(db, 'translations', id);
+            await updateDoc(docRef, { fileName: newTitle });
+            toast.success('Translation renamed!');
+        } catch {
+            toast.error('Failed to rename translation.');
+        }
+    };
+
+    const handleLoadFromHistory = (item: TranslationHistoryItem) => {
+        if (!item || !item.translationResult) return;
+
+        setTranslationResult(item.translationResult);
+
+        // Get all available language codes from the translation result
+        const availableCodes = Object.keys(item.translationResult);
+
+        // Use availableCodes for tabs and selection
+        setLastTargetCodes(availableCodes);
+
+        // Pick the first valid language as default tab/preview
+        const firstLang = availableCodes[0] ?? null;
+        setSelectedLangTab(firstLang);
+        setSelectedPreviewLang(firstLang);
+
+        setFileName(item.fileName ?? 'Untitled');
+        setTranslationTitle(item.fileName ?? 'Untitled Translation');
+        setIsUserTranslation(false);
+
+        toast.success('Loaded translation from history!');
+    };
+
     /* ------------- helpers */
     const toggleLanguage = (shortcut: string) => {
         setSelectedShortcuts(prev => {
@@ -88,34 +151,22 @@ export default function TranslatorPage() {
         setFileName(file.name);
         const reader = new FileReader();
         reader.onload = () => {
-            try {
-                const json = JSON.parse(reader.result as string);
-                setJsonInput(JSON.stringify(json, null, 2));
-                setMode('file');
-            } catch {
-                alert('Invalid JSON file');
+            let text = reader.result as string;
+            // If not wrapped in { }, wrap it
+            const trimmed = text.trim();
+            if (trimmed.length && !trimmed.startsWith('{') && !trimmed.endsWith('}')) {
+                text = `{${trimmed}}`;
             }
+            const json = safeParseJsonInput(text);
+            if (!json) {
+                alert('Invalid JSON file');
+                return;
+            }
+            setJsonInput(JSON.stringify(json, null, 2));
+            setMode('file');
         };
         reader.readAsText(file);
     };
-    type JsonValue = string | { [key: string]: JsonValue };
-
-    function flattenJson(obj: JsonValue, res: Record<string, string> = {}): Record<string, string> {
-        if (typeof obj !== 'object' || obj === null) {
-            return res;
-        }
-
-        for (const key in obj) {
-            const val = obj[key];
-            if (typeof val === 'string') {
-                res[key] = val;
-            } else {
-                flattenJson(val, res); // no prefix nesting
-            }
-        }
-
-        return res;
-    }
 
     const transformToUnityFormat = (result: Record<string, Record<string, string>> | null) => {
         if (!result) return {};
@@ -196,9 +247,51 @@ export default function TranslatorPage() {
         a.click();
         URL.revokeObjectURL(url);
     };
-
+    useEffect(() => {
+        if (
+            isPro &&
+            translationResult &&
+            user &&
+            user.uid &&
+            Object.keys(translationResult).length > 0 &&
+            isUserTranslation // <-- Only save if user-generated
+        ) {
+            const saveHistory = async () => {
+                try {
+                    await addDoc(collection(db, 'translations'), {
+                        userId: user?.uid,
+                        fileName: fileName ?? 'Untitled',
+                        sourceLanguage: 'EN',
+                        targetLanguages: Array.from(selectedShortcuts),
+                        translationResult,
+                        createdAt: serverTimestamp(),
+                    });
+                } catch {
+                    // Optionally handle error
+                }
+            };
+            saveHistory();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [translationResult]);
+    useEffect(() => {
+        console.log('User:', user);
+    }, [user]);
     /* ---------------- translate ---------------- */
     const handleTranslate = async () => {
+        if (isTranslating) return;
+        setIsTranslating(true); // <-- Start loading effect
+
+        if (mode === 'keys') {
+            const kv = Object.fromEntries(
+                rows.filter(r => r.key && r.value).map(r => [r.key, r.value]),
+            );
+            if (Object.keys(kv).length === 0) {
+                toast.error('No keys found for translation.');
+                return;
+            }
+        }
+
         const targetCodes = LANGUAGE_OPTIONS.filter(l => selectedShortcuts.has(l.shortcut)).map(
             l => l.code,
         );
@@ -217,7 +310,7 @@ export default function TranslatorPage() {
             mode === 'file'
                 ? (() => {
                       try {
-                          return flattenJson(JSON.parse(jsonInput || '{}'));
+                          return parseInput(jsonInput || '{}');
                       } catch {
                           alert('❌ Invalid JSON payload');
                           return null;
@@ -232,7 +325,6 @@ export default function TranslatorPage() {
 
         if (!payload) return;
 
-        setIsTranslating(true);
         try {
             // Wait a moment to ensure Firebase auth is ready
             await new Promise(resolve => setTimeout(resolve, 100));
@@ -244,13 +336,14 @@ export default function TranslatorPage() {
             // We just need to flatten each language's result for display
             const finalResult: Record<string, Record<string, string>> = {};
             for (const langCode in translations) {
-                finalResult[langCode] = flattenJson(translations[langCode]);
+                finalResult[langCode] = translations[langCode];
             }
 
             setTranslationResult(finalResult);
             setLastTargetCodes(targetCodes);
             setSelectedLangTab(targetCodes[0] ?? null);
             setSelectedPreviewLang(targetCodes[0] ?? null);
+            setIsUserTranslation(true); // <-- Mark as user translation
         } catch (e) {
             console.error('[Translayte] Translation error:', e);
 
@@ -270,28 +363,20 @@ export default function TranslatorPage() {
                 alert('Translation failed. Please try again.');
             }
         } finally {
-            setIsTranslating(false);
+            setIsTranslating(false); // <-- Stop loading effect
         }
     };
 
-    // const handleReset = () => {
-    //     setSelectedShortcuts(new Set());
-    //     setRows([{ key: '', value: '', context: '' }]);
-    //     setJsonInput('');
-    //     setTranslationResult(null);
-    // };
     function mergeAllTranslations(
         translations: Record<string, Record<string, string>>,
     ): Record<string, string> {
         const merged: Record<string, string> = {};
-
         for (const [lang, entries] of Object.entries(translations)) {
             for (const [key, value] of Object.entries(entries)) {
                 const newKey = `${lang}:${key}`;
                 merged[newKey] = value;
             }
         }
-
         return merged;
     }
     const tryTranslate = () => {
@@ -322,6 +407,38 @@ export default function TranslatorPage() {
         const { url } = await res.json();
         window.location.href = url;
     };
+
+    const [, setPresentUsers] = useState<
+        { uid: string; displayName: string; isEditing: boolean }[]
+    >([]);
+
+    useEffect(() => {
+        if (!translationId || !user) return;
+        const presenceRef = doc(db, 'translations', translationId, 'presence', user.uid);
+        setDoc(presenceRef, {
+            uid: user.uid,
+            displayName: user.displayName,
+            isEditing: false,
+            lastActive: Date.now(),
+        });
+        interface PresenceUser {
+            uid: string;
+            displayName: string;
+            isEditing: boolean;
+            lastActive: number;
+        }
+        const unsub = onSnapshot(
+            collection(db, 'translations', translationId, 'presence'),
+            snap => {
+                setPresentUsers(snap.docs.map(d => d.data() as PresenceUser));
+            },
+        );
+        window.addEventListener('beforeunload', () => deleteDoc(presenceRef));
+        return () => {
+            deleteDoc(presenceRef);
+            unsub();
+        };
+    }, [translationId, user]);
     useEffect(() => {
         if (!user || !user.uid) return; // ⬅️ wait for user
 
@@ -330,6 +447,45 @@ export default function TranslatorPage() {
         });
         return () => unsub();
     }, [user]);
+
+    useEffect(() => {
+        if (!user || !user.uid) return;
+
+        // Listen for keys_this_month
+        const userUnsub = onSnapshot(doc(db, 'users', user.uid), snap => {
+            setKeysThisMonth(snap.data()?.keys_month || 0);
+        });
+
+        // Listen for translations history
+        setHistoryLoading(true);
+        const translationsUnsub = onSnapshot(
+            collection(db, 'translations'),
+            snap => {
+                const items = snap.docs
+                    .map(doc => {
+                        const data = doc.data() as TranslationHistoryItem;
+                        return { ...data, id: doc.id };
+                    })
+                    .filter(item => item.userId === user.uid)
+                    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+                setHistory(items);
+                setHistoryLoading(false);
+            },
+            () => {
+                setHistoryLoading(false);
+                toast.error('Failed to load translation history.');
+            },
+        );
+
+        // Cleanup both listeners on unmount or user changeconsole
+        console.log('ąaa');
+        console.log(history);
+        return () => {
+            userUnsub();
+            translationsUnsub();
+        };
+    }, [user]);
+
     type ViewTabKey = 'json' | 'table' | 'original' | 'all';
     const VIEW_TABS: { key: ViewTabKey; label: string }[] = [
         { key: 'json', label: 'JSON' },
@@ -414,310 +570,353 @@ export default function TranslatorPage() {
                         {/* -----  file mode  ----- */}
                         {mode === 'file' && (
                             <>
-                                <DropZone
-                                    onSelect={handleFileUpload}
-                                    fileName={fileName}
-                                    translationResult={translationResult}
-                                />
-
-                                {!translationResult && (
-                                    <>
-                                        <RealtimeInputSection
-                                            inputText={jsonInput}
-                                            setInputText={setJsonInput}
-                                            onDuplicatesChange={setRealtimeDuplicates}
+                                {!translationResult ? (
+                                    <div
+                                        className="flex flex-col"
+                                        style={{ minHeight: 'calc(100vh - 30rem)' }}
+                                    >
+                                        <DropZone
+                                            onSelect={handleFileUpload}
+                                            fileName={fileName}
+                                            translationResult={translationResult}
                                         />
+                                        <div className="flex-grow">
+                                            <RealtimeInputSection
+                                                inputText={jsonInput}
+                                                setInputText={setJsonInput}
+                                                onDuplicatesChange={setRealtimeDuplicates}
+                                            />
+                                        </div>
 
                                         {/* Show duplicate warning */}
                                         {realtimeDuplicates?.hasDuplicates && (
-                                            <DuplicateWarning
-                                                analysis={realtimeDuplicates}
-                                                onUnify={unifiedTranslations => {
-                                                    const unifiedJson = JSON.stringify(
-                                                        unifiedTranslations,
-                                                        null,
-                                                        2,
-                                                    );
-                                                    setJsonInput(unifiedJson);
-                                                    setRealtimeDuplicates(null);
-                                                }}
-                                                onDismiss={() => setRealtimeDuplicates(null)}
-                                                originalTranslations={(() => {
-                                                    try {
-                                                        const parsed = JSON.parse(jsonInput);
-                                                        return parsed;
-                                                    } catch {
-                                                        return {};
-                                                    }
-                                                })()}
-                                            />
+                                            <div className="mt-4 flex-shrink-0">
+                                                <DuplicateWarning
+                                                    analysis={realtimeDuplicates}
+                                                    onUnify={unifiedTranslations => {
+                                                        const unifiedJson = JSON.stringify(
+                                                            unifiedTranslations,
+                                                            null,
+                                                            2,
+                                                        );
+                                                        setJsonInput(unifiedJson);
+                                                        setRealtimeDuplicates(null);
+                                                    }}
+                                                    onDismiss={() => setRealtimeDuplicates(null)}
+                                                    originalTranslations={(() => {
+                                                        try {
+                                                            const parsed = JSON.parse(jsonInput);
+                                                            return parsed;
+                                                        } catch {
+                                                            return {};
+                                                        }
+                                                    })()}
+                                                />
+                                            </div>
                                         )}
-                                    </>
-                                )}
-
-                                {translationResult && (
+                                    </div>
+                                ) : (
                                     <div className="mt-[-1px] rounded-t-none rounded-b-xl border border-gray-700 bg-[#1b1b1b] shadow-lg overflow-hidden">
-                                        <div className="flex flex-col md:flex-row">
-                                            {/* Main: view content */}
-                                            <div className="flex flex-wrap items-center gap-2 mb-4">
-                                                {/* View mode tabs */}
-                                                <div className="flex gap-2 mb-4">
-                                                    {VIEW_TABS.map(tab => (
-                                                        <button
-                                                            key={tab.key}
-                                                            onClick={() => setSelectedView(tab.key)}
-                                                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                                                                selectedView === tab.key
-                                                                    ? 'bg-[#8B5CF6] text-white'
-                                                                    : 'bg-[#1f1f1f] text-gray-300 hover:bg-[#2a2a2a]'
-                                                            }`}
-                                                        >
-                                                            {tab.label}
-                                                        </button>
-                                                    ))}
-                                                </div>
-
-                                                <div className="flex justify-end mb-2">
+                                        {/* --- Top Toolbar: Language Selection --- */}
+                                        <div className="flex items-center border-b border-gray-800 bg-[#0F0F0F]/50 px-4 pt-2 space-x-1 overflow-x-auto">
+                                            <button
+                                                onClick={() => setSelectedLangTab('ALL')}
+                                                className={`px-4 py-2 rounded-t-md text-sm font-medium transition-colors whitespace-nowrap ${
+                                                    selectedLangTab === 'ALL'
+                                                        ? 'bg-[#1b1b1b] text-white'
+                                                        : 'text-gray-400 hover:bg-[#2a2a2a]/50'
+                                                }`}
+                                            >
+                                                All Languages
+                                            </button>
+                                            {lastTargetCodes.map(code => {
+                                                const lang = LANGUAGE_OPTIONS.find(
+                                                    l => l.code === code,
+                                                );
+                                                return (
                                                     <button
-                                                        onClick={() => setColorized(v => !v)}
-                                                        className="text-sm text-gray-300 hover:text-white bg-[#1f1f1f] border border-gray-700 px-3 py-1 rounded-md"
+                                                        key={code}
+                                                        onClick={() => setSelectedLangTab(code)}
+                                                        className={`px-4 py-2 rounded-t-md text-sm font-medium transition-colors whitespace-nowrap ${
+                                                            selectedLangTab === code
+                                                                ? 'bg-[#1b1b1b] text-white'
+                                                                : 'text-gray-400 hover:bg-[#2a2a2a]/50'
+                                                        }`}
                                                     >
-                                                        {colorized
-                                                            ? 'Disable Coloring'
-                                                            : 'Enable Coloring'}
+                                                        {lang?.name ?? code}
                                                     </button>
-                                                </div>
+                                                );
+                                            })}
+                                        </div>
 
-                                                {translationResult && selectedLangTab && (
-                                                    <div className="flex gap-2 mb-4">
-                                                        <button
-                                                            onClick={copyCurrent}
-                                                            className="px-3 py-1.5 rounded-md bg-[#1f1f1f] text-gray-200 hover:bg-[#2a2a2a] text-sm font-medium"
-                                                        >
-                                                            <i className="fa-solid fa-copy mr-1" />{' '}
-                                                            Copy
-                                                        </button>
-                                                        <button
-                                                            onClick={downloadCurrent}
-                                                            className="px-3 py-1.5 rounded-md bg-[#1f1f1f] text-gray-200 hover:bg-[#2a2a2a] text-sm font-medium"
-                                                        >
-                                                            <i className="fa-solid fa-download mr-1" />{' '}
-                                                            Download
-                                                        </button>
-                                                    </div>
-                                                )}
-                                                {/* Display selected translation view */}
-                                                <div className="flex flex-col w-full min-h-[400px]">
-                                                    <div className="flex-1 w-full">
-                                                        {selectedView === 'json' &&
-                                                            selectedLangTab && (
-                                                                <div className="bg-[#111111] p-4 rounded-lg border border-gray-700 overflow-auto">
-                                                                    <pre
-                                                                        className="font-mono whitespace-pre text-sm leading-relaxed"
-                                                                        dangerouslySetInnerHTML={{
-                                                                            __html: colorized
-                                                                                ? highlightJson(
-                                                                                      prettyJson(
-                                                                                          outputFormat ===
-                                                                                              'unity'
-                                                                                              ? transformToUnityFormat(
-                                                                                                    selectedLangTab ===
-                                                                                                        'ALL'
-                                                                                                        ? translationResult
-                                                                                                        : {
-                                                                                                              [selectedLangTab]:
-                                                                                                                  translationResult?.[
-                                                                                                                      selectedLangTab
-                                                                                                                  ] ??
-                                                                                                                  {},
-                                                                                                          },
-                                                                                                )
-                                                                                              : selectedLangTab ===
-                                                                                                'ALL'
-                                                                                              ? Object.fromEntries(
-                                                                                                    Object.entries(
-                                                                                                        translationResult ??
-                                                                                                            {},
-                                                                                                    ).map(
-                                                                                                        ([
-                                                                                                            langCode,
-                                                                                                            entries,
-                                                                                                        ]) => [
-                                                                                                            langCode.slice(
-                                                                                                                0,
-                                                                                                                2,
-                                                                                                            ),
-                                                                                                            entries,
-                                                                                                        ],
-                                                                                                    ),
-                                                                                                )
-                                                                                              : translationResult?.[
-                                                                                                    selectedLangTab
-                                                                                                ] ??
-                                                                                                {},
-                                                                                      ),
-                                                                                  )
-                                                                                : prettyJson(
-                                                                                      outputFormat ===
-                                                                                          'unity'
-                                                                                          ? transformToUnityFormat(
-                                                                                                selectedLangTab ===
-                                                                                                    'ALL'
-                                                                                                    ? translationResult
-                                                                                                    : {
-                                                                                                          [selectedLangTab]:
-                                                                                                              translationResult?.[
-                                                                                                                  selectedLangTab
-                                                                                                              ] ??
-                                                                                                              {},
-                                                                                                      },
-                                                                                            )
-                                                                                          : selectedLangTab ===
-                                                                                            'ALL'
-                                                                                          ? Object.fromEntries(
-                                                                                                Object.entries(
-                                                                                                    translationResult ??
-                                                                                                        {},
-                                                                                                ).map(
-                                                                                                    ([
-                                                                                                        langCode,
-                                                                                                        entries,
-                                                                                                    ]) => [
-                                                                                                        langCode.slice(
-                                                                                                            0,
-                                                                                                            2,
-                                                                                                        ),
-                                                                                                        entries,
-                                                                                                    ],
-                                                                                                ),
-                                                                                            )
-                                                                                          : translationResult?.[
-                                                                                                selectedLangTab
-                                                                                            ] ?? {},
-                                                                                  ),
-                                                                        }}
-                                                                    />
-                                                                </div>
-                                                            )}
+                                        {/* --- Sub-Toolbar: View Controls & Actions --- */}
+                                        <div className="flex flex-wrap items-center justify-between gap-4 p-4">
+                                            {/* Left: View Mode Tabs */}
+                                            <div className="flex items-center gap-2">
+                                                {VIEW_TABS.map(tab => (
+                                                    <button
+                                                        key={tab.key}
+                                                        onClick={() => setSelectedView(tab.key)}
+                                                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                                                            selectedView === tab.key
+                                                                ? 'bg-[#8B5CF6] text-white'
+                                                                : 'bg-[#2a2a2a] text-gray-300 hover:bg-[#3a3a3a]'
+                                                        }`}
+                                                    >
+                                                        {tab.label}
+                                                    </button>
+                                                ))}
+                                            </div>
 
-                                                        {selectedView === 'table' &&
-                                                            selectedLangTab && (
-                                                                <div className="overflow-x-auto bg-[#111111] p-4 rounded-lg border border-gray-700">
-                                                                    <table className="w-full text-left text-sm text-gray-300">
-                                                                        <thead>
-                                                                            <tr>
-                                                                                <th className="py-2 px-4 border-b border-gray-800 font-semibold">
-                                                                                    Key
-                                                                                </th>
-                                                                                <th className="py-2 px-4 border-b border-gray-800 font-semibold">
-                                                                                    Translation
-                                                                                </th>
-                                                                            </tr>
-                                                                        </thead>
-                                                                        <tbody>
-                                                                            {Object.entries(
-                                                                                outputFormat ===
-                                                                                    'unity'
-                                                                                    ? transformToUnityFormat(
-                                                                                          selectedLangTab ===
-                                                                                              'ALL'
-                                                                                              ? translationResult
-                                                                                              : {
-                                                                                                    [selectedLangTab]:
-                                                                                                        translationResult?.[
-                                                                                                            selectedLangTab
-                                                                                                        ] ??
-                                                                                                        {},
-                                                                                                },
-                                                                                      )
-                                                                                    : selectedLangTab ===
-                                                                                      'ALL'
-                                                                                    ? mergeAllTranslations(
-                                                                                          translationResult ??
+                                            {/* Right: Action Buttons */}
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => setColorized(v => !v)}
+                                                    className="px-3 py-1.5 rounded-md bg-[#2a2a2a] text-gray-300 hover:bg-[#3a3a3a] text-sm font-medium"
+                                                    title={
+                                                        colorized
+                                                            ? 'Disable Coloring'
+                                                            : 'Enable Coloring'
+                                                    }
+                                                >
+                                                    <i
+                                                        className={`fa-solid ${
+                                                            colorized ? 'fa-eye-slash' : 'fa-eye'
+                                                        }`}
+                                                    />
+                                                </button>
+                                                <button
+                                                    onClick={copyCurrent}
+                                                    className="px-3 py-1.5 rounded-md bg-[#2a2a2a] text-gray-300 hover:bg-[#3a3a3a] text-sm font-medium"
+                                                >
+                                                    <i className="fa-solid fa-copy mr-1" /> Copy
+                                                </button>
+                                                <button
+                                                    onClick={downloadCurrent}
+                                                    className="px-3 py-1.5 rounded-md bg-[#2a2a2a] text-gray-300 hover:bg-[#3a3a3a] text-sm font-medium"
+                                                >
+                                                    <i className="fa-solid fa-download mr-1" />{' '}
+                                                    Download
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* --- Main Content Area --- */}
+                                        <div className="px-4 pb-4 min-h-[400px]">
+                                            {/* The content rendering logic remains the same */}
+                                            {selectedView === 'json' && selectedLangTab && (
+                                                <div className="bg-[#111111] p-4 rounded-lg border border-gray-700 overflow-auto">
+                                                    <pre
+                                                        className="font-mono whitespace-pre text-sm leading-relaxed"
+                                                        dangerouslySetInnerHTML={{
+                                                            __html: colorized
+                                                                ? highlightJson(
+                                                                      prettyJson(
+                                                                          outputFormat === 'unity'
+                                                                              ? transformToUnityFormat(
+                                                                                    selectedLangTab ===
+                                                                                        'ALL'
+                                                                                        ? translationResult
+                                                                                        : {
+                                                                                              [selectedLangTab]:
+                                                                                                  translationResult?.[
+                                                                                                      selectedLangTab
+                                                                                                  ] ??
+                                                                                                  {},
+                                                                                          },
+                                                                                )
+                                                                              : selectedLangTab ===
+                                                                                'ALL'
+                                                                              ? Object.fromEntries(
+                                                                                    Object.entries(
+                                                                                        translationResult ??
+                                                                                            {},
+                                                                                    ).map(
+                                                                                        ([
+                                                                                            langCode,
+                                                                                            entries,
+                                                                                        ]) => [
+                                                                                            langCode.slice(
+                                                                                                0,
+                                                                                                2,
+                                                                                            ),
+                                                                                            entries,
+                                                                                        ],
+                                                                                    ),
+                                                                                )
+                                                                              : translationResult?.[
+                                                                                    selectedLangTab
+                                                                                ] ?? {},
+                                                                      ),
+                                                                  )
+                                                                : prettyJson(
+                                                                      outputFormat === 'unity'
+                                                                          ? transformToUnityFormat(
+                                                                                selectedLangTab ===
+                                                                                    'ALL'
+                                                                                    ? translationResult
+                                                                                    : {
+                                                                                          [selectedLangTab]:
+                                                                                              translationResult?.[
+                                                                                                  selectedLangTab
+                                                                                              ] ??
                                                                                               {},
-                                                                                      )
-                                                                                    : translationResult?.[
-                                                                                          selectedLangTab
-                                                                                      ] ?? {},
-                                                                            ).map(
-                                                                                ([key, value]) => (
-                                                                                    <tr key={key}>
-                                                                                        <td className="py-1 px-4 border-b border-gray-800 text-orange-400">
-                                                                                            {key}
-                                                                                        </td>
-                                                                                        <td className="py-1 px-4 border-b border-gray-800 text-green-400">
-                                                                                            {typeof value ===
-                                                                                            'object'
-                                                                                                ? JSON.stringify(
-                                                                                                      value,
-                                                                                                  )
-                                                                                                : value}
-                                                                                        </td>
-                                                                                    </tr>
+                                                                                      },
+                                                                            )
+                                                                          : selectedLangTab ===
+                                                                            'ALL'
+                                                                          ? Object.fromEntries(
+                                                                                Object.entries(
+                                                                                    translationResult ??
+                                                                                        {},
+                                                                                ).map(
+                                                                                    ([
+                                                                                        langCode,
+                                                                                        entries,
+                                                                                    ]) => [
+                                                                                        langCode.slice(
+                                                                                            0,
+                                                                                            2,
+                                                                                        ),
+                                                                                        entries,
+                                                                                    ],
                                                                                 ),
-                                                                            )}
-                                                                        </tbody>
-                                                                    </table>
-                                                                </div>
-                                                            )}
-                                                        {selectedView === 'original' && (
-                                                            <div className="bg-[#111111] p-4 rounded-lg border border-gray-700">
-                                                                <textarea
-                                                                    value={jsonInput}
-                                                                    onChange={e =>
-                                                                        setJsonInput(e.target.value)
-                                                                    }
-                                                                    spellCheck={false}
-                                                                    className="w-full bg-transparent font-mono text-sm text-gray-200 focus:outline-none resize-none"
-                                                                    style={{
-                                                                        minHeight: '200px',
-                                                                        color: '#e5e7eb', // text-gray-200
-                                                                        // No blue, just your neutrals
-                                                                    }}
-                                                                />
-                                                                <div className="mt-2 text-xs text-gray-500">
-                                                                    You can edit the original source
-                                                                    here before re-translating.
+                                                                            )
+                                                                          : translationResult?.[
+                                                                                selectedLangTab
+                                                                            ] ?? {},
+                                                                  ),
+                                                        }}
+                                                    />
+                                                </div>
+                                            )}
+                                            {selectedView === 'table' && selectedLangTab && (
+                                                <div className="overflow-x-auto bg-[#111111] p-4 rounded-lg border border-gray-700">
+                                                    <table className="w-full text-left text-sm text-gray-300">
+                                                        <thead>
+                                                            <tr>
+                                                                <th className="py-2 px-4 border-b border-gray-800 font-semibold">
+                                                                    Key
+                                                                </th>
+                                                                <th className="py-2 px-4 border-b border-gray-800 font-semibold">
+                                                                    Translation
+                                                                </th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {Object.entries(
+                                                                outputFormat === 'unity'
+                                                                    ? transformToUnityFormat(
+                                                                          selectedLangTab === 'ALL'
+                                                                              ? translationResult
+                                                                              : {
+                                                                                    [selectedLangTab]:
+                                                                                        translationResult?.[
+                                                                                            selectedLangTab
+                                                                                        ] ?? {},
+                                                                                },
+                                                                      )
+                                                                    : selectedLangTab === 'ALL'
+                                                                    ? mergeAllTranslations(
+                                                                          translationResult ?? {},
+                                                                      )
+                                                                    : translationResult?.[
+                                                                          selectedLangTab
+                                                                      ] ?? {},
+                                                            ).map(([key, value]) => (
+                                                                <tr key={key} className="group">
+                                                                    <td className="py-2 px-4 border-b border-gray-800 text-orange-400 relative">
+                                                                        <span className="pr-6">
+                                                                            {key}
+                                                                        </span>
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                navigator.clipboard.writeText(
+                                                                                    key,
+                                                                                );
+                                                                                toast.success(
+                                                                                    'Key copied!',
+                                                                                );
+                                                                            }}
+                                                                            className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-white"
+                                                                            title="Copy key"
+                                                                        >
+                                                                            <i className="fa-solid fa-copy text-xs" />
+                                                                        </button>
+                                                                    </td>
+                                                                    <td className="py-2 px-4 border-b border-gray-800 text-green-400 relative">
+                                                                        <span className="pr-6">
+                                                                            {typeof value ===
+                                                                            'object'
+                                                                                ? JSON.stringify(
+                                                                                      value,
+                                                                                  )
+                                                                                : value}
+                                                                        </span>
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                const textToCopy =
+                                                                                    typeof value ===
+                                                                                    'object'
+                                                                                        ? JSON.stringify(
+                                                                                              value,
+                                                                                          )
+                                                                                        : String(
+                                                                                              value,
+                                                                                          );
+                                                                                navigator.clipboard.writeText(
+                                                                                    textToCopy,
+                                                                                );
+                                                                                toast.success(
+                                                                                    'Value copied!',
+                                                                                );
+                                                                            }}
+                                                                            className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-white"
+                                                                            title="Copy value"
+                                                                        >
+                                                                            <i className="fa-solid fa-copy text-xs" />
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            )}
+                                            {selectedView === 'original' && (
+                                                <div className="bg-[#111111] p-4 rounded-lg border border-gray-700">
+                                                    <div className="relative w-full">
+                                                        <textarea
+                                                            value={jsonInput}
+                                                            onChange={e =>
+                                                                setJsonInput(e.target.value)
+                                                            }
+                                                            disabled={isTranslating}
+                                                            className={`w-full h-64 p-4 rounded-lg bg-[#0F0F0F] border resize-none text-gray-300 
+                                                                border-gray-700 focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6] focus:outline-none`}
+                                                            placeholder="Paste your JSON, key-value pairs, or plain text here..."
+                                                            style={{ verticalAlign: 'top' }}
+                                                        />
+                                                        {isTranslating && (
+                                                            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center rounded-lg">
+                                                                <div className="flex flex-col items-center text-center">
+                                                                    <i className="fa-solid fa-spinner fa-spin text-3xl text-[#8B5CF6]"></i>
+                                                                    <span className="mt-3 text-white font-medium">
+                                                                        Translating...
+                                                                    </span>
+                                                                    <span className="mt-1 text-xs text-gray-300">
+                                                                        This may take a moment.
+                                                                    </span>
                                                                 </div>
                                                             </div>
                                                         )}
                                                     </div>
+                                                    <div className="mt-2 text-xs text-gray-500">
+                                                        You can edit the original source here before
+                                                        re-translating.
+                                                    </div>
                                                 </div>
-                                            </div>
-
-                                            {/* Vertical language tabs */}
-                                            <div className="flex flex-col gap-2 p-4 border-l border-gray-800">
-                                                <button
-                                                    onClick={() => setSelectedLangTab('ALL')}
-                                                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                                                        selectedLangTab === 'ALL'
-                                                            ? 'bg-[#8B5CF6] text-white'
-                                                            : 'bg-[#1f1f1f] text-gray-300 hover:bg-[#2a2a2a]'
-                                                    }`}
-                                                >
-                                                    ALL
-                                                </button>
-
-                                                {LANGUAGE_OPTIONS.filter(lang =>
-                                                    Object.keys(translationResult || {}).includes(
-                                                        lang.code,
-                                                    ),
-                                                ).map(lang => (
-                                                    <button
-                                                        key={lang.code}
-                                                        onClick={() =>
-                                                            setSelectedLangTab(lang.code)
-                                                        }
-                                                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                                                            selectedLangTab === lang.code
-                                                                ? 'bg-[#8B5CF6] text-white'
-                                                                : 'bg-[#1f1f1f] text-gray-300 hover:bg-[#2a2a2a]'
-                                                        }`}
-                                                    >
-                                                        {lang.shortcut}
-                                                    </button>
-                                                ))}
-                                            </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -736,8 +935,8 @@ export default function TranslatorPage() {
                         {/* Language selection info */}
                     </section>
 
-                    {/* ------------ picker ------------ */}
-                    <aside className="w-full lg:w-3/12 h-fit">
+                    {/* ------------ sidebar column ------------ */}
+                    <aside className="w-full lg:w-3/12">
                         <div className="bg-[#191919]/80 backdrop-blur-sm rounded-xl p-6 border border-gray-700">
                             {/* Lang limit info as a tab on top */}
                             <header className="flex justify-between items-center mb-6">
@@ -788,13 +987,13 @@ export default function TranslatorPage() {
                         {/* buttons */}
                         <div className="bg-[#191919]/70 backdrop-blur-sm rounded-lg p-4 mt-4 flex flex-col  gap-4">
                             <div className="flex w-full items-center justify-between gap-4">
-                                <span className="text-sm text-gray-300">Output Format</span>
+                                <span className="text-sm text-gray-300">Output format</span>
                                 <div className="flex items-center bg-[#0F0F0F] rounded-lg p-1 border border-gray-700">
                                     <button
                                         onClick={() => setOutputFormat('standard')}
                                         className={`px-3 py-1 text-xs rounded-md transition-colors ${
                                             outputFormat === 'standard'
-                                                ? 'bg-purple-600 text-white'
+                                                ? 'bg-[#8B5CF6] text-white'
                                                 : 'text-gray-400 hover:bg-gray-800'
                                         }`}
                                     >
@@ -804,7 +1003,7 @@ export default function TranslatorPage() {
                                         onClick={() => setOutputFormat('unity')}
                                         className={`px-3 py-1 text-xs rounded-md transition-colors ${
                                             outputFormat === 'unity'
-                                                ? 'bg-purple-600 text-white'
+                                                ? 'bg-[#8B5CF6] text-white'
                                                 : 'text-gray-400 hover:bg-gray-800'
                                         }`}
                                     >
@@ -812,16 +1011,6 @@ export default function TranslatorPage() {
                                     </button>
                                 </div>
                             </div>
-                            <Toggle
-                                label="Save translation"
-                                checked={minify}
-                                onChange={setMinify}
-                            />
-                            <Toggle
-                                label="Pro translayte"
-                                checked={keepOrder}
-                                onChange={setKeepOrder}
-                            />
                         </div>
                         {showPaywall && (
                             <div className="p-4 mb-4 bg-yellow-800 text-yellow-100 rounded">
@@ -834,528 +1023,32 @@ export default function TranslatorPage() {
                         )}
                         <div className="flex flex-col sm:flex-row gap-4 mt-4">
                             <TranslateButton onClick={tryTranslate} loading={isTranslating} />
-                            {/* <button
-                                onClick={handleReset}
-                                disabled={isTranslating}
-                                className="inline-flex items-center justify-center px-8 py-4 rounded-lg font-semibold text-gray-200 bg-[#191919]/80"
-                            >
-                                <i className="fa-solid fa-rotate-left mr-2" />
-                            </button> */}
                         </div>
-                        {/* Success message */}
+
+                        {/* --- Translation History Section --- */}
+                        {isPro && (
+                            <div className="bg-[#191919]/70 backdrop-blur-sm rounded-lg p-4 mt-4">
+                                <h3 className="text-base font-semibold text-white mb-3 flex items-center gap-2">
+                                    <i className="fa-solid fa-clock-rotate-left text-[#8B5CF6]" />
+                                    History
+                                </h3>
+                                <HistoryAside
+                                    history={history}
+                                    loading={historyLoading}
+                                    onLoad={handleLoadFromHistory}
+                                    onDelete={deleteTranslation}
+                                    onUpdateTitle={handleUpdateTitle}
+                                />
+                            </div>
+                        )}
                     </aside>
                 </div>
             </main>
-            {/* Duplicate Warning */}
-            {showDuplicateWarning && duplicateAnalysis && (
-                <DuplicateWarning
-                    analysis={duplicateAnalysis}
-                    onUnify={handleUnifyDuplicates}
-                    onDismiss={handleDismissDuplicateWarning}
-                    originalTranslations={processedTranslations || parseInput(jsonInput)}
-                />
-            )}
+
+            {/* Remove the old, full-width history display at the bottom */}
         </>
     );
 }
-
-/* ---------------------------------------------------------------- small ui helpers (unstyled) */
-const ModeSwitcher = ({
-    mode,
-    setMode,
-}: {
-    mode: 'file' | 'keys';
-    setMode: React.Dispatch<React.SetStateAction<'file' | 'keys'>>;
-}) => (
-    <div className="flex justify-center mb-10">
-        <div className="inline-flex w-full max-w-xl gap-2 rounded-xl p-2 bg-[#0F0F0F] shadow-lg">
-            {(['file', 'keys'] as const).map(m => {
-                const active = mode === m;
-                return (
-                    <button
-                        key={m}
-                        onClick={() => setMode(m)}
-                        className={`flex flex-col items-center justify-center flex-1 px-3 py-3 rounded-lg border transition-all
-                            border-gray-700/50
-                            ${active ? 'bg-[#8B5CF6]/10 ring-2 ring-[#8B5CF6]' : 'bg-primary/50'}
-                            cursor-pointer
-                        `}
-                    >
-                        <i
-                            className={`${
-                                m === 'file' ? 'fa-solid fa-file-arrow-up' : 'fa-solid fa-key'
-                            } text-lg mb-1 ${active ? 'text-[#8B5CF6]' : 'text-gray-400'}`}
-                        />
-                        <span
-                            className="font-bold text-sm"
-                            style={{
-                                color: active ? '#8B5CF6' : '#d1d5db',
-                                fontWeight: active ? 800 : 600,
-                            }}
-                        >
-                            {m === 'file' ? 'File Upload' : 'Key Input'}
-                        </span>
-                    </button>
-                );
-            })}
-        </div>
-    </div>
-);
-
-interface DZProps {
-    onSelect: (e: ChangeEvent<HTMLInputElement>) => void;
-    fileName?: string | null;
-    translationResult?: Record<string, Record<string, string>> | null;
-}
-const DropZone: React.FC<DZProps> = ({ onSelect, fileName, translationResult }) => {
-    const canvasRef = useRef<HTMLCanvasElement | null>(null);
-    const [drag, setDrag] = useState(false);
-    const dragRef = useRef(false);
-    const pointer = useRef<{ x: number; y: number } | null>(null);
-
-    // Keep drag state in a ref for animation
-    useEffect(() => {
-        dragRef.current = drag;
-    }, [drag]);
-
-    useEffect(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        const DPR = window.devicePixelRatio || 1;
-        const resize = () => {
-            canvas.width = canvas.offsetWidth * DPR;
-            canvas.height = canvas.offsetHeight * DPR;
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
-            ctx.scale(DPR, DPR);
-        };
-        resize();
-        window.addEventListener('resize', resize);
-
-        // Only create particles once
-        const N = 120;
-        const particles = Array.from({ length: N }, () => ({
-            x: Math.random() * canvas.offsetWidth,
-            y: Math.random() * canvas.offsetHeight,
-            vx: (Math.random() - 0.5) * 0.35,
-            vy: (Math.random() - 0.5) * 0.35,
-        }));
-
-        let frame: number;
-        const loop = () => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            // Add opacity to the background fill (e.g. 0.85)
-            ctx.globalAlpha = 0.85;
-            ctx.fillStyle = '#0F0F0F';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.globalAlpha = 1;
-
-            // move
-            particles.forEach(p => {
-                p.x += p.vx;
-                p.y += p.vy;
-
-                // Wrap horizontally
-                if (p.x < 0) p.x = canvas.offsetWidth;
-                if (p.x > canvas.offsetWidth) p.x = 0;
-
-                // Wrap vertically
-                if (p.y < 0) p.y = canvas.offsetHeight;
-                if (p.y > canvas.offsetHeight) p.y = 0;
-            });
-
-            // More synapses: lower the distance threshold
-            ctx.strokeStyle = dragRef.current ? '#8B5CF6' : '#5034b5';
-            ctx.lineWidth = 0.6;
-            for (let i = 0; i < N; i++) {
-                for (let j = i + 1; j < N; j++) {
-                    const a = particles[i];
-                    const b = particles[j];
-                    const dx = a.x - b.x;
-                    const dy = a.y - b.y;
-                    const dist2 = dx * dx + dy * dy;
-                    if (dist2 < 120 * 120) {
-                        ctx.globalAlpha = 1 - dist2 / (120 * 120);
-                        ctx.beginPath();
-                        ctx.moveTo(a.x, a.y);
-                        ctx.lineTo(b.x, b.y);
-                        ctx.stroke();
-                    }
-                }
-            }
-            ctx.globalAlpha = 1;
-
-            // synapse lines to cursor while dragging
-            if (dragRef.current && pointer.current) {
-                ctx.strokeStyle = '#8B5CF6';
-                particles.forEach(p => {
-                    const dx = p.x - pointer.current!.x;
-                    const dy = p.y - pointer.current!.y;
-                    const d2 = dx * dx + dy * dy;
-                    if (d2 < 180 * 180) {
-                        ctx.globalAlpha = 1 - d2 / (180 * 180);
-                        ctx.beginPath();
-                        ctx.moveTo(p.x, p.y);
-                        ctx.lineTo(pointer.current!.x, pointer.current!.y);
-                        ctx.stroke();
-                    }
-                });
-                ctx.globalAlpha = 1;
-            }
-
-            // particles
-            ctx.fillStyle = '#8B5CF6';
-            particles.forEach(p => {
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
-                ctx.fill();
-            });
-
-            frame = requestAnimationFrame(loop);
-        };
-        loop();
-
-        return () => {
-            cancelAnimationFrame(frame);
-            window.removeEventListener('resize', resize);
-        };
-    }, []);
-
-    /* ---------------- render */
-    return (
-        <label
-            onDragEnter={e => {
-                e.preventDefault();
-                setDrag(true);
-                const rect = (e.target as HTMLElement).getBoundingClientRect();
-                pointer.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-            }}
-            onDragOver={e => {
-                e.preventDefault();
-                const rect = (e.target as HTMLElement).getBoundingClientRect();
-                pointer.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-            }}
-            onDragLeave={() => {
-                setDrag(false);
-                pointer.current = null;
-            }}
-            onDrop={e => {
-                e.preventDefault();
-                setDrag(false);
-                pointer.current = null;
-                const file = e.dataTransfer.files?.[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                        try {
-                            JSON.parse(reader.result as string);
-                            // Create a mock FileList with the required 'item' method
-                            const files: FileList = {
-                                0: file,
-                                length: 1,
-                                item: (index: number) => (index === 0 ? file : null),
-                                [Symbol.iterator]: function* () {
-                                    yield file;
-                                },
-                            } as unknown as FileList;
-                            onSelect({ target: { files } } as ChangeEvent<HTMLInputElement>);
-                        } catch {
-                            alert('Invalid JSON');
-                        }
-                    };
-                    reader.readAsText(file);
-                }
-            }}
-            htmlFor="file-upload"
-            className={`relative flex flex-col items-center justify-center ${
-                translationResult ? 'h-20' : 'h-60'
-            } mb-8 border-dashed rounded-xl cursor-pointer overflow-hidden transition-colors duration-200 ${
-                drag
-                    ? 'border-[#8B5CF6] bg-[#1a1333]/80'
-                    : fileName
-                    ? 'border-[#a78bfa] bg-[#a78bfa]/20'
-                    : 'border-[#8B5CF633] bg-transparent'
-            }`}
-            style={
-                {
-                    // Remove background color from label, let canvas handle it
-                }
-            }
-        >
-            {/* Canvas for animation */}
-            <canvas
-                ref={canvasRef}
-                className="absolute inset-0 rounded-xl pointer-events-none"
-                style={{ zIndex: 0 }}
-            />
-            {/* Content always above the canvas */}
-            <div className="relative z-10 flex flex-col items-center text-center px-4 pointer-events-none select-none">
-                <i
-                    className={`fa-solid ${
-                        fileName ? 'fa-file-circle-check' : 'fa-cloud-arrow-up'
-                    } text-4xl mb-4`}
-                    style={{ color: fileName ? '#a78bfa' : '#8B5CF6' }}
-                />
-                {fileName ? (
-                    <>
-                        <p className="text-lg font-semibold" style={{ color: '#a78bfa' }}>
-                            File loaded!
-                        </p>
-                        <p className="text-sm mt-1" style={{ color: '#a78bfa' }}>
-                            {fileName}
-                        </p>
-                        <span
-                            className="mt-4 relative inline-flex items-center justify-center px-6 py-2
-                        rounded-lg font-bold text-base border"
-                            style={{
-                                color: '#fff',
-                                background: '#a78bfa',
-                                borderColor: '#a78bfa',
-                            }}
-                        >
-                            Change file
-                        </span>
-                    </>
-                ) : (
-                    <>
-                        <p className="text-lg font-semibold">Drop your JSON file here</p>
-                        <p className="text-gray-400 text-sm">or click to browse</p>
-                        {translationResult && (
-                            <span
-                                className="mt-4 relative inline-flex items-center justify-center px-6 py-2
-                        bg-[#8B5CF6]/50 rounded-lg font-bold text-base border"
-                                style={{ color: '#8B5CF6', borderColor: '#a78bfa', borderWidth: 1 }}
-                            >
-                                Browse files
-                            </span>
-                        )}
-                    </>
-                )}
-            </div>
-            <input
-                id="file-upload"
-                type="file"
-                accept=".json"
-                onChange={onSelect}
-                className="sr-only"
-            />
-        </label>
-    );
-};
-
-const LanguageGrid = ({
-    selected,
-    toggle,
-    availableLangCodes,
-    selectedPreviewLang,
-    setSelectedPreviewLang,
-}: {
-    selected: Set<string>;
-    toggle: (sc: string) => void;
-    availableLangCodes?: string[];
-    selectedPreviewLang?: string | null;
-    setSelectedPreviewLang?: (code: string) => void;
-}) => {
-    const [expanded, setExpanded] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [perRow, setPerRow] = useState(2);
-    const searchInputRef = useRef<HTMLInputElement>(null);
-
-    useEffect(() => {
-        if (window.innerWidth >= 640) setPerRow(3);
-        else setPerRow(2);
-    }, []);
-
-    // Filter languages based on search query
-    const filteredLanguages = LANGUAGE_OPTIONS.filter(
-        lang =>
-            lang.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            lang.shortcut.toLowerCase().includes(searchQuery.toLowerCase()),
-    );
-
-    const visibleLanguages = expanded ? filteredLanguages : LANGUAGE_OPTIONS.slice(0, perRow);
-
-    const handleToggleExpanded = () => {
-        if (!expanded) {
-            setExpanded(true);
-            // Focus the search input after animation completes
-            setTimeout(() => {
-                searchInputRef.current?.focus();
-            }, 300);
-        } else {
-            setExpanded(false);
-            setSearchQuery('');
-        }
-    };
-
-    const clearSearch = () => {
-        setSearchQuery('');
-        searchInputRef.current?.focus();
-    };
-
-    return (
-        <div>
-            {/* Language Grid */}
-            <div className="flex flex-col items-end">
-                <div
-                    className={`w-full transition-all duration-300 ease-in-out ${
-                        expanded ? 'max-h-32 opacity-100' : 'max-h-12 opacity-100'
-                    }`}
-                >
-                    {expanded ? (
-                        /* Search Bar Mode */
-                        <div className="space-y-3">
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i className="fa-solid fa-search text-gray-400 text-sm" />
-                                </div>
-                                <input
-                                    ref={searchInputRef}
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={e => setSearchQuery(e.target.value)}
-                                    placeholder="Search languages..."
-                                    className="w-full pl-10 pr-10 py-2 bg-[#1f1f1f] border border-gray-600 rounded-lg text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8B5CF6] focus:border-transparent transition-all duration-200"
-                                />
-                                {searchQuery && (
-                                    <button
-                                        onClick={clearSearch}
-                                        className="absolute inset-y-0 right-10 pr-3 flex items-center text-gray-400 hover:text-gray-200 transition-colors"
-                                    >
-                                        <i className="fa-solid fa-times text-sm" />
-                                    </button>
-                                )}
-                                <button
-                                    onClick={handleToggleExpanded}
-                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-200 transition-colors"
-                                    title="Collapse"
-                                >
-                                    <i className="fa-solid fa-chevron-up text-sm" />
-                                </button>
-                            </div>
-
-                            {/* Search Results Info & Selected Count */}
-
-                            {/* Quick Filter Badges */}
-                            {searchQuery === '' && (
-                                <div className="flex flex-wrap gap-2">
-                                    <span className="text-xs text-gray-400 mr-1">Quick:</span>
-                                    {['Popular', 'European', 'Asian', 'African'].map(filter => (
-                                        <button
-                                            key={filter}
-                                            onClick={() => {
-                                                // Simple filter implementation - you can enhance this
-                                                const filterMap: { [key: string]: string } = {
-                                                    Popular: 'en',
-                                                    European: 'de',
-                                                    Asian: 'ja',
-                                                    African: 'ar',
-                                                };
-                                                setSearchQuery(filterMap[filter] || '');
-                                            }}
-                                            className="px-2 py-1 text-xs bg-gray-700 text-gray-300 rounded-full hover:bg-gray-600 transition-colors duration-200"
-                                        >
-                                            {filter}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        /* Show More Button Mode */
-                        LANGUAGE_OPTIONS.length > perRow && (
-                            <div className="flex items-center justify-between w-full">
-                                <button
-                                    className="flex items-center gap-2 px-4 py-2 text-[#8B5CF6] font-medium transition-all duration-200 text-sm cursor-pointer  rounded-lg group ml-auto"
-                                    onClick={handleToggleExpanded}
-                                >
-                                    <span>Show more</span>
-                                    <i className="fa-solid fa-chevron-down transition-transform duration-200 group-hover:translate-y-0.5" />
-                                </button>
-                            </div>
-                        )
-                    )}
-                </div>
-            </div>
-            <div
-                className={`grid grid-cols-2 sm:grid-cols-3 gap-3 pr-2 p-2 transition-all duration-300 ${
-                    expanded
-                        ? 'max-h-[400px] overflow-y-scroll mb-4'
-                        : 'max-h-none overflow-visible mb-0'
-                }`}
-                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-            >
-                <style jsx>{`
-                    div::-webkit-scrollbar {
-                        display: none;
-                    }
-                `}</style>
-
-                {visibleLanguages.length === 0 && searchQuery ? (
-                    <div className="col-span-full text-center py-8 text-gray-400">
-                        <i className="fa-solid fa-search text-2xl mb-2 block" />
-                        <p>No languages match &quot;{searchQuery}&quot;</p>
-                        <button
-                            onClick={clearSearch}
-                            className="mt-2 text-[#8B5CF6] hover:text-[#9333ea] text-sm font-medium"
-                        >
-                            Clear search
-                        </button>
-                    </div>
-                ) : (
-                    visibleLanguages.map(lang => {
-                        const isSelected = selected.has(lang.shortcut);
-                        const isTranslated = availableLangCodes?.includes(lang.code);
-                        const isActive = selectedPreviewLang === lang.code;
-
-                        return (
-                            <button
-                                key={lang.code}
-                                onClick={() => {
-                                    toggle(lang.shortcut);
-                                    if (isTranslated && setSelectedPreviewLang) {
-                                        setSelectedPreviewLang(lang.code);
-                                    }
-                                }}
-                                className={`relative flex flex-col items-start px-3 py-2 rounded-lg border text-left transition-all duration-200 transform hover:scale-105
-                                    border-gray-700/50 cursor-pointer
-                                    ${
-                                        isSelected
-                                            ? 'bg-[#8B5CF6]/10 ring-2 ring-[#8B5CF6] shadow-lg'
-                                            : 'bg-primary/50 hover:bg-primary/70'
-                                    }
-                                    ${isActive ? 'ring-2 ring-[#8B5CF6]' : ''}
-                                `}
-                            >
-                                <span
-                                    className="font-bold transition-colors duration-200"
-                                    style={{
-                                        color: isSelected ? '#8B5CF6' : '#d1d5db',
-                                        fontWeight: isSelected ? 800 : 600,
-                                    }}
-                                >
-                                    {lang.shortcut}
-                                </span>
-                                <span className="text-xs text-gray-400 transition-colors duration-200">
-                                    {lang.name}
-                                </span>
-                                {isTranslated && (
-                                    <div className="absolute top-1 right-1">
-                                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                                    </div>
-                                )}
-                            </button>
-                        );
-                    })
-                )}
-            </div>
-
-            {/* Animated Search Bar / Toggle Area */}
-        </div>
-    );
-};
 
 const TranslateButton = ({ onClick, loading }: { onClick: () => void; loading: boolean }) => (
     <button
@@ -1375,120 +1068,28 @@ const TranslateButton = ({ onClick, loading }: { onClick: () => void; loading: b
         </span>
     </button>
 );
-
-/* toggle */
-interface ToggleProps {
-    label: string;
-    checked: boolean;
-    onChange: (next: boolean) => void;
-}
-const Toggle: React.FC<ToggleProps> = ({ label, checked, onChange }) => (
-    <label className="flex w-full items-center justify-between gap-4 cursor-pointer select-none">
-        <span className="text-sm text-gray-300">{label}</span>
-        <span className="relative inline-block w-12 h-6">
-            <input
-                type="checkbox"
-                className="sr-only peer"
-                checked={checked}
-                onChange={e => onChange(e.target.checked)}
-            />
-            <span className="absolute inset-0 rounded-full transition bg-gray-700 peer-checked:bg-[#8B5CF6]" />
-            <span
-                className="absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow transition
-          peer-checked:translate-x-6"
-            />
-        </span>
-    </label>
-);
-
-/* --------------------- Duplicate Detection Logic --------------------- */
-// function to analyze duplicates after parsing input
-const analyzeDuplicates = (translations: Record<string, string>) => {
-    const analysis = detectDuplicates(translations);
-
-    return analysis;
-};
-
-// flattenJson utility for parseInput
-type JsonValue = string | { [key: string]: JsonValue };
-function flattenJson(obj: JsonValue, res: Record<string, string> = {}): Record<string, string> {
-    if (typeof obj !== 'object' || obj === null) {
-        return res;
-    }
-
-    for (const key in obj) {
-        const val = obj[key];
-        if (typeof val === 'string') {
-            res[key] = val;
-        } else {
-            flattenJson(val, res); // no prefix nesting
-        }
-    }
-
-    return res;
-}
-
-// update parseInput function to include duplicate detection
-const parseInput = (input: string): Record<string, string> => {
-    const trimmedInput = input.trim();
-
-    if (!trimmedInput) {
-        return {};
-    }
-
+async function deleteTranslation(id: string) {
     try {
-        // Try parsing as JSON first
-        const parsed = JSON.parse(trimmedInput);
-
-        if (typeof parsed === 'object' && parsed !== null) {
-            const flattened = flattenJson(parsed);
-            // Analyze duplicates after parsing
-            analyzeDuplicates(flattened);
-            return flattened;
-        }
+        await deleteDoc(doc(db, 'translations', id));
+        toast.success('Translation deleted!');
     } catch {
-        // Not valid JSON, try other formats
+        toast.error('Failed to delete translation.');
     }
+}
 
-    // Handle line-by-line format
-    const lines = trimmedInput.split('\n').filter(line => line.trim());
-    const result: Record<string, string> = {};
+function safeParseJsonInput(input: string): object | null {
+    let text = input.trim();
 
-    lines.forEach((line, index) => {
-        const trimmedLine = line.trim();
-        if (!trimmedLine) return;
+    // Remove trailing commas before wrapping
+    text = text.replace(/,(\s*})?$/gm, '$1');
 
-        const colonIndex = trimmedLine.indexOf(':');
-        const equalIndex = trimmedLine.indexOf('=');
-
-        if (colonIndex > 0 && (equalIndex === -1 || colonIndex < equalIndex)) {
-            const key = trimmedLine.substring(0, colonIndex).trim().replace(/['"]/g, '');
-            const value = trimmedLine
-                .substring(colonIndex + 1)
-                .trim()
-                .replace(/['"]/g, '');
-            result[key] = value;
-        } else if (equalIndex > 0) {
-            const key = trimmedLine.substring(0, equalIndex).trim().replace(/['"]/g, '');
-            const value = trimmedLine
-                .substring(equalIndex + 1)
-                .trim()
-                .replace(/['"]/g, '');
-            result[key] = value;
-        } else {
-            result[`text_${index + 1}`] = trimmedLine;
-        }
-    });
-
-    // Analyze duplicates
-    analyzeDuplicates(result);
-    return result;
-};
-
-// handlers for duplicate warning
-const handleUnifyDuplicates = () => {
-    // Update the input text area with unified content
-    // Show success message
-};
-
-const handleDismissDuplicateWarning = () => {};
+    // If not wrapped in { }, wrap it
+    if (text.length && !text.startsWith('{') && !text.endsWith('}')) {
+        text = `{${text}}`;
+    }
+    try {
+        return JSON.parse(text);
+    } catch {
+        return null;
+    }
+}

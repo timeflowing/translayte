@@ -6,7 +6,6 @@ import { auth, db } from '../lib/firebaseClient';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 export interface User {
-    getIdToken: () => Promise<string>; // Fixed: should be a function that returns Promise<string>
     uid: string;
     firstName: string;
     lastName: string;
@@ -56,13 +55,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         // Merge Firebase Auth user methods with Firestore data
                         setUser({
                             ...userData,
-                            getIdToken: authUser.getIdToken.bind(authUser), // Bind the actual method
+                            uid: authUser.uid,
                         } as User);
+                        console.log('Loaded user from Firestore:', {
+                            ...userData,
+                        });
                     } else {
                         const [firstName, ...rest] = (authUser.displayName || '').split(' ');
                         const lastName = rest.join(' ');
                         const profile: User = {
-                            getIdToken: authUser.getIdToken.bind(authUser), // Bind the actual method
                             uid: authUser.uid,
                             displayName: authUser.displayName || '',
                             firstName,
