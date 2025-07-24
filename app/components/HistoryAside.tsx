@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { toast } from 'react-toastify';
 interface HistoryItem {
     id: string;
-    fileName: string | null;
-    createdAt: { seconds: number; nanoseconds: number } | null;
+    fileName?: string;
+    createdAt?: { seconds: number; nanoseconds: number };
     targetLanguages?: string[]; // Added property for target languages
     // Add other properties from your history item type if needed
     // [key: string]: any; // Removed to avoid 'any' type error

@@ -31,14 +31,13 @@ import ModeSwitcher from '../components/ModeSwitcher';
 import { DropZone } from '../components/DropZone';
 import { parseInput } from '../utils/inputParser';
 
-type TranslationHistoryItem = {
+type HistoryItem = {
     id: string;
     userId?: string;
     fileName?: string;
     targetLanguages?: string[];
     translationResult?: Record<string, Record<string, string>>;
     createdAt?: { seconds: number; nanoseconds: number };
-    [key: string]: unknown;
 };
 
 export default function TranslatorPage() {
@@ -89,7 +88,7 @@ export default function TranslatorPage() {
     > | null>(null);
     const [realtimeDuplicates, setRealtimeDuplicates] = useState<DuplicateAnalysis | null>(null);
     /* ------------- history */
-    const [history, setHistory] = useState<TranslationHistoryItem[]>([]);
+    const [history, setHistory] = useState<HistoryItem[]>([]);
     const [historyLoading, setHistoryLoading] = useState(false);
     const [isUserTranslation, setIsUserTranslation] = useState(false);
 
@@ -103,7 +102,7 @@ export default function TranslatorPage() {
         }
     };
 
-    const handleLoadFromHistory = (item: TranslationHistoryItem) => {
+    const handleLoadFromHistory = (item: HistoryItem) => {
         if (!item || !item.translationResult) return;
 
         setTranslationResult(item.translationResult);
@@ -463,7 +462,7 @@ export default function TranslatorPage() {
             snap => {
                 const items = snap.docs
                     .map(doc => {
-                        const data = doc.data() as TranslationHistoryItem;
+                        const data = doc.data() as HistoryItem;
                         return {
                             ...data,
                             id: doc.id,
