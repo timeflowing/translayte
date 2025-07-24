@@ -464,7 +464,11 @@ export default function TranslatorPage() {
                 const items = snap.docs
                     .map(doc => {
                         const data = doc.data() as TranslationHistoryItem;
-                        return { ...data, id: doc.id };
+                        return {
+                            ...data,
+                            id: doc.id,
+                            fileName: typeof data.fileName === 'string' ? data.fileName : undefined,
+                        };
                     })
                     .filter(item => item.userId === user.uid)
                     .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
@@ -1044,8 +1048,6 @@ export default function TranslatorPage() {
                     </aside>
                 </div>
             </main>
-
-            {/* Remove the old, full-width history display at the bottom */}
         </>
     );
 }

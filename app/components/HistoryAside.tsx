@@ -2,14 +2,13 @@
 
 import { useState } from 'react';
 import { toast } from 'react-toastify';
-import { LANGUAGE_OPTIONS } from '../languages';
-
 interface HistoryItem {
     id: string;
     fileName: string | null;
     createdAt: { seconds: number; nanoseconds: number } | null;
+    targetLanguages?: string[]; // Added property for target languages
     // Add other properties from your history item type if needed
-    [key: string]: any;
+    // [key: string]: any; // Removed to avoid 'any' type error
 }
 
 interface HistoryAsideProps {
@@ -34,27 +33,6 @@ export const HistoryAside: React.FC<HistoryAsideProps> = ({
     const [editingText, setEditingText] = useState('');
 
     // Dynamically create the map from your LANGUAGE_OPTIONS constant
-    const langToCountryCode = LANGUAGE_OPTIONS.reduce((acc, lang) => {
-        acc[lang.shortcut] = lang.country;
-        return acc;
-    }, {} as Record<string, string>);
-
-    // Utility function to get flag emoji from country code
-    const getFlagEmoji = (countryCode: string) => {
-        if (!countryCode) return '🏳️';
-        // Convert country code to regional indicator symbols
-        const codePoints = countryCode
-            .toUpperCase()
-            .split('')
-            .map(char => 0x1f1e6 + char.charCodeAt(0) - 'A'.charCodeAt(0));
-        return String.fromCodePoint(...codePoints);
-    };
-
-    const getFlag = (langCode: string) => {
-        const countryCode = langToCountryCode[langCode];
-        return getFlagEmoji(countryCode);
-    };
-
     const formatDateTime = (date: Date) => {
         return `${date.toLocaleDateString()}   ${date.toLocaleTimeString([], {
             hour: '2-digit',
