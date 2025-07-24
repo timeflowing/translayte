@@ -10,6 +10,7 @@ import {
 } from '../../utils/translationUtils';
 import RealtimeInputSection from '../RealtimeInputSection';
 import { DuplicateAnalysis } from '@/app/utils/duplicateDetection';
+import { toast } from 'react-hot-toast';
 
 type TranslationResult = Record<string, Record<string, string>>;
 type ViewTabKey = 'json' | 'table' | 'original';
@@ -42,7 +43,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
     );
     const [selectedView, setSelectedView] = useState<ViewTabKey>('json');
     const [colorized, setColorized] = useState(true);
-    const [realtimeDuplicates, setRealtimeDuplicates] = useState<DuplicateAnalysis | null>(null);
+    const [, setRealtimeDuplicates] = useState<DuplicateAnalysis | null>(null);
 
     const dataForView = getDataForView(translationResult, selectedLangTab, outputFormat);
 
