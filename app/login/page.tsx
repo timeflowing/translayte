@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import GoogleLoginButton from '../utils/signInWithGoogle';
-import GitHubLoginButton from '../utils/singInWithGithub';
 import { auth } from '../lib/firebaseClient';
 import SynapseAnimation from '../utils/SynapseAnimation';
 import { useAuthState } from 'react-firebase-hooks/auth';
@@ -162,7 +161,6 @@ const LoginPage: React.FC = () => {
                     {/* Social Buttons */}
                     <div className="flex flex-col gap-3">
                         <GoogleLoginButton />
-                        <GitHubLoginButton />
                     </div>
                     <p className="mt-6 text-center text-gray-400 text-sm">
                         Don&apos;t have an account?{' '}

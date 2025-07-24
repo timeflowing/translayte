@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth } from '../lib/firebaseClient';
 import GoogleLoginButton from '../utils/signInWithGoogle';
-import GitHubLoginButton from '../utils/singInWithGithub';
 import SynapseAnimation from '../utils/SynapseAnimation';
 
 const RegisterPage = () => {
@@ -190,7 +189,6 @@ const RegisterPage = () => {
                     {/* Social Buttons */}
                     <div className="flex flex-col gap-3">
                         <GoogleLoginButton />
-                        <GitHubLoginButton />
                     </div>
                     <p className="mt-6 text-center text-gray-400 text-sm">
                         Already have an account?{' '}

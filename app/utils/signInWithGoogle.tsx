@@ -16,7 +16,7 @@ const GoogleLoginButton = () => {
     return (
         <button
             onClick={handleLogin}
-            className="flex items-center justify-center gap-3 w-full px-6 py-3 mt-4 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors text-sm font-medium text-gray-700 shadow-sm"
+            className="flex items-center justify-center gap-3 w-full px-6 py-3 mt-4 border border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors text-sm font-medium text-gray-700 shadow-sm"
         >
             <GoogleIcon />
             Continue with Google
