@@ -18,7 +18,7 @@ interface BillingItem {
 }
 
 const BillingPage: React.FC = () => {
-    const { user } = useAuth();
+    const { user } = useAuth() as { user: { getIdToken: () => Promise<string> } | null };
     const [subscription, setSubscription] = useState<Subscription | null>(null);
     const [billingHistory, setBillingHistory] = useState<BillingItem[]>([]);
     const [loading, setLoading] = useState(true);
