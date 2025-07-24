@@ -67,7 +67,6 @@ const RealtimeInputSection: React.FC<RealtimeInputSectionProps> = ({
 
     const hasDuplicates = duplicateAnalysis?.hasDuplicates || false;
     const duplicateCount = duplicateAnalysis?.totalDuplicates || 0;
-    const potentialSavings = duplicateAnalysis?.potentialSavings || 0;
 
     return (
         <div className="flex flex-col h-[480px] bg-[#1b1b1b] rounded-xl border border-gray-700/80 shadow-lg overflow-hidden">

@@ -49,7 +49,7 @@ export const getDataForView = (
     result: TranslationResult | null,
     selectedLang: string | null,
     outputFormat: 'standard' | 'unity'
-): Record<string, any> => {
+): Record<string, unknown> => {
     if (!result || !selectedLang) return {};
 
     if (outputFormat === 'unity') {
@@ -69,7 +69,7 @@ export const getDataForView = (
  * Copies the currently displayed data to the clipboard.
  * @param data - The data object to copy.
  */
-export const copyDataToClipboard = (data: Record<string, any>) => {
+export const copyDataToClipboard = (data: Record<string, unknown>) => {
     if (Object.keys(data).length === 0) return;
     navigator.clipboard.writeText(JSON.stringify(data, null, 2));
     toast.success('Copied to clipboard!');
@@ -80,7 +80,7 @@ export const copyDataToClipboard = (data: Record<string, any>) => {
  * @param data - The data object to download.
  * @param fileName - The base name for the downloaded file.
  */
-export const downloadDataAsJson = (data: Record<string, any>, fileName: string) => {
+export const downloadDataAsJson = (data: Record<string, unknown>, fileName: string) => {
     if (Object.keys(data).length === 0) return;
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
