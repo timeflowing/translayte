@@ -453,36 +453,47 @@ const LandingPage = () => {
 
             {/* ------------------------------ Features list ------------------- */}
             <Section id="features" title="Everything You Need, Nothing You Don't" dark>
-                <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-                    {[
-                        ['Supports nested JSON', 'Complex structures? No problem.'],
-                        ['Auto-detects base language', "We figure out what you're starting with."],
-                        [
-                            'Handles placeholders and variables',
-                            'Variables like {name} and %s stay intact.',
-                        ],
-                        [
-                            'Preserves whitespace and formatting',
-                            'Your output looks as clean as your input.',
-                        ],
-                        ['Full preview before download', 'Review translations before exporting.'],
-                        [
-                            'Works with i18next, Next.js, Vue i18n',
-                            'Compatible with popular frameworks.',
-                        ],
-                        ['Fast export to .json or .js', 'Get the format you need, instantly.'],
-                        ['No hidden fees', 'Transparent, flat pricing—no surprises.'],
-                    ].map(([title, desc]) => (
-                        <div key={title} className="flex items-start space-x-4">
-                            <div className="bg-[#8B5CF6]/20 p-2 rounded-lg">
-                                <i className="fa-solid fa-check text-[#8B5CF6]" />
+                <div className="flex justify-center">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl w-full mx-auto">
+                        {[
+                            ['Supports nested JSON', 'Complex structures? No problem.'],
+                            [
+                                'Auto-detects base language',
+                                "We figure out what you're starting with.",
+                            ],
+                            [
+                                'Handles placeholders and variables',
+                                'Variables like {name} and %s stay intact.',
+                            ],
+                            [
+                                'Preserves whitespace and formatting',
+                                'Your output looks as clean as your input.',
+                            ],
+                            [
+                                'Full preview before download',
+                                'Review translations before exporting.',
+                            ],
+                            [
+                                'Works with i18next, Next.js, Vue i18n',
+                                'Compatible with popular frameworks.',
+                            ],
+                            ['Fast export to .json or .js', 'Get the format you need, instantly.'],
+                            ['No hidden fees', 'Transparent, flat pricing—no surprises.'],
+                        ].map(([title, desc]) => (
+                            <div
+                                key={title}
+                                className="flex flex-row items-center space-x-4 mx-auto w-full justify-start"
+                            >
+                                <div className="bg-[#8B5CF6]/20 p-2 rounded-lg flex items-center justify-center min-w-[40px] min-h-[40px]">
+                                    <i className="fa-solid fa-check text-[#8B5CF6] text-xl" />
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold mb-1">{title}</h3>
+                                    <p className="text-sm text-gray-300">{desc}</p>
+                                </div>
                             </div>
-                            <div>
-                                <h3 className="font-semibold mb-1">{title}</h3>
-                                <p className="text-sm text-gray-300">{desc}</p>
-                            </div>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
             </Section>
 
