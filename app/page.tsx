@@ -23,7 +23,7 @@ const NAV_LINKS = [
 ] as const;
 const translations = {
     es: {
-        'WelcomeScreen.greeting': 'Hola, ¿qué tal?',
+        'WelcomeScreen.greeting': 'Holla allí,',
         'WelcomeScreen.title': 'Bienvenido a Translayte',
         'Navigation.home': 'Panel principal',
         'Navigation.about': 'Sobre nuestro equipo',
@@ -239,6 +239,18 @@ const LandingPage = () => {
         (code: typeof selectedLang) => setSelectedLang(code),
         [],
     );
+    const [jsonInput, setJsonInput] = useState('');
+    const [keyCount, setKeyCount] = useState(0);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setJsonInput(e.target.value);
+        try {
+            const obj = safeParseJsonInput(e.target.value);
+            setKeyCount(obj ? Object.keys(obj).length : 0);
+        } catch {
+            setKeyCount(0);
+        }
+    };
     return (
         <>
             {/* Vanta target */}
