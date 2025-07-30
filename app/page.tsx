@@ -239,18 +239,7 @@ const LandingPage = () => {
         (code: typeof selectedLang) => setSelectedLang(code),
         [],
     );
-    const [jsonInput, setJsonInput] = useState('');
-    const [keyCount, setKeyCount] = useState(0);
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        setJsonInput(e.target.value);
-        try {
-            const obj = safeParseJsonInput(e.target.value);
-            setKeyCount(obj ? Object.keys(obj).length : 0);
-        } catch {
-            setKeyCount(0);
-        }
-    };
     return (
         <>
             {/* Vanta target */}
