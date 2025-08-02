@@ -91,6 +91,8 @@ export default function TranslatorPage() {
     const [history, setHistory] = useState<HistoryItem[]>([]);
     const [historyLoading, setHistoryLoading] = useState(false);
     const [isUserTranslation, setIsUserTranslation] = useState(false);
+    const [keyCount, setKeyCount] = useState(0);
+    const [, setCharCount] = useState(0);
 
     const handleUpdateTitle = async (id: string, newTitle: string) => {
         try {
@@ -278,7 +280,8 @@ export default function TranslatorPage() {
     }, [user]);
     /* ---------------- translate ---------------- */
     const handleTranslate = async () => {
-        if (isTranslating) return;
+        console.log(isTranslating);
+
         setIsTranslating(true); // <-- Start loading effect
 
         if (mode === 'keys') {
@@ -384,8 +387,9 @@ export default function TranslatorPage() {
             window.location.href = '/login';
             return;
         }
-        if (!isPro && keysThisMonth >= 200) {
+        if (!isPro && keyCount > 200) {
             setShowPaywall(true);
+            toast.error('Free plan limit: 200 keys per month.');
             return;
         }
         handleTranslate();
@@ -446,6 +450,25 @@ export default function TranslatorPage() {
         });
         return () => unsub();
     }, [user]);
+
+    useEffect(() => {
+        try {
+            const obj = safeParseJsonInput(jsonInput);
+            setKeyCount(obj ? Object.keys(obj).length : 0);
+            setCharCount(jsonInput.length);
+        } catch {
+            setKeyCount(0);
+            setCharCount(jsonInput.length);
+        }
+    }, [jsonInput]);
+
+    useEffect(() => {
+        if (mode === 'keys') {
+            const validRows = rows.filter(r => r.key && r.value);
+            setKeyCount(validRows.length);
+            setCharCount(validRows.reduce((acc, row) => acc + row.value.length, 0));
+        }
+    }, [rows, mode]);
 
     useEffect(() => {
         if (!user || !user.uid) return;
