@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { onAuthStateChanged, updateProfile } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db as firestore } from '../lib/firebaseClient';
@@ -165,7 +166,7 @@ const ProfilePage = () => {
             {/* Header Bar */}
             <header className="flex items-center justify-between px-8 py-4 bg-[#181428] border-b border-[#282443]">
                 <div className="flex items-center gap-4">
-                    <span className="text-lg font-bold text-[#A383F7]">Translayte AI</span>
+                    <span className="text-lg font-bold text-[#A383F7]">Translayte</span>
                     <nav className="ml-6 flex gap-5">
                         <NavLink href="/dashboard">Dashboard</NavLink>
                         <NavLink href="/translations">Translations</NavLink>
@@ -176,10 +177,11 @@ const ProfilePage = () => {
                     </nav>
                 </div>
                 <div className="flex items-center gap-6">
-                    <span className="text-white text-sm">?</span>
-                    <img
+                    <Image
                         src={firebaseUser.photoURL || '/avatar.svg'}
                         alt="User avatar"
+                        width={32}
+                        height={32}
                         className="w-8 h-8 rounded-full border-2 border-[#A383F7]"
                     />
                 </div>
@@ -190,7 +192,7 @@ const ProfilePage = () => {
                 <div className="w-full bg-[#A383F7] text-[#191627] px-8 py-2 text-center font-semibold text-sm flex items-center justify-center">
                     <span>
                         Your trial ends in {trialDaysLeft} day{trialDaysLeft === 1 ? '' : 's'}.
-                        Upgrade now to get the most out of Translayte AI!
+                        Upgrade now to get the most out of Translayte!
                     </span>
                     <button className="ml-3 px-3 py-1 rounded bg-white text-[#7b3aed] font-semibold text-xs">
                         Get Pro
@@ -200,9 +202,11 @@ const ProfilePage = () => {
 
             {/* Profile Overview */}
             <div className="flex items-center gap-4 px-8 py-6 bg-transparent border-b border-[#282443]">
-                <img
+                <Image
                     src={firebaseUser.photoURL || '/avatar.svg'}
                     alt="User avatar"
+                    width={64}
+                    height={64}
                     className="w-16 h-16 rounded-full border-4 border-[#A383F7]"
                 />
                 <div>
@@ -435,7 +439,7 @@ const ProfilePage = () => {
 
             {/* Footer */}
             <footer className="px-8 py-4 text-xs text-[#A383F7] flex items-center justify-between border-t border-[#282443] bg-[#181428]">
-                <span>© 2025 Translayte AI. All rights reserved.</span>
+                <span>© 2025 Translayte. All rights reserved.</span>
                 <span className="text-gray-400">Contact: support@translayte.it</span>
             </footer>
         </div>

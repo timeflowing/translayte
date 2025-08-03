@@ -565,8 +565,6 @@ export default function TranslatorPage() {
                     <Link href="/" className="text-xl font-bold gradient-text">
                         Translayte
                     </Link>
-
-                    {/* Usage pill */}
                     {user && (
                         <div className="text-sm text-gray-300 flex items-center gap-2">
                             <i className="fa-solid fa-key text-yellow-400" />
@@ -575,7 +573,6 @@ export default function TranslatorPage() {
                                 : `Free — ${keysThisMonth} / ${FREE_TIER_KEY_LIMIT} keys`}
                         </div>
                     )}
-
                     {/* Auth nav */}
                     {user ? (
                         <div className="relative">

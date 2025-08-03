@@ -1,3 +1,26 @@
+/**
+ * Billing API Route
+ * ------------------
+ * Endpoint:   GET /api/billing
+ * Purpose:    Returns current user's Stripe subscription status and billing history.
+ *
+ * Navigation:
+ *   - Method: GET
+ *   - URL:    /api/billing
+ *   - Auth:   Bearer token in Authorization header (Firebase ID token)
+ *   - Example:
+ *       fetch('/api/billing', { headers: { Authorization: `Bearer <idToken>` } })
+ *
+ * Details:
+ *   - Reads Stripe customer ID from Firestore (customers/{uid}.stripeId)
+ *   - Fetches subscription and invoice data from Stripe
+ *   - Returns: { subscription, billingHistory }
+ *
+ * Maintainer notes:
+ *   - Stripe API version: 2024-06-20
+ *   - Requires STRIPE_SECRET_KEY in environment
+ *   - Used by billing page for transparency and legal compliance
+ */
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDB } from '@/app/lib/firebaseAdmin';
 import { Stripe } from 'stripe';
@@ -21,10 +44,11 @@ export async function GET(req: NextRequest) {
     const decodedToken = await adminAuth.verifyIdToken(idToken);
     const userId = decodedToken.uid;
 
-    // Get user's Stripe customer ID from Firestore
-    const userDoc = await adminDB.collection('users').doc(userId).get();
-    const userData = userDoc.data();
-    const stripeCustomerId = userData?.stripeCustomerId;
+
+    // Get user's Stripe customer ID from Firestore Stripe extension (customers/{uid})
+    const customerDoc = await adminDB.collection('customers').doc(userId).get();
+    const customerData = customerDoc.data();
+    const stripeCustomerId = customerData?.stripeId;
 
     if (!stripeCustomerId) {
       // User might not have a subscription yet, which is not an error.
@@ -44,7 +68,8 @@ export async function GET(req: NextRequest) {
     let subscriptionData = null;
     if (subscriptions.data.length > 0) {
       const sub = subscriptions.data[0];
-      const plan = sub.items.data[0]?.price.nickname || 'Unknown Plan';
+      let plan = sub.items.data[0]?.price.nickname;
+      if (!plan || plan === 'Unknown Plan') plan = 'Pro';
       subscriptionData = {
         plan: plan,
         status: sub.status,
