@@ -52,7 +52,7 @@ export const LanguageGrid = ({
     };
 
     return (
-        <div>
+        <div className="mt-4">
             {/* Language Grid Controls */}
             <div className="flex flex-col items-end">
                 <div
@@ -62,7 +62,7 @@ export const LanguageGrid = ({
                 >
                     {expanded ? (
                         <div className="space-y-3">
-                            <div className="relative">
+                            <div className="relative mb-3">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <i className="fa-solid fa-search text-gray-400 text-sm" />
                                 </div>
@@ -72,7 +72,14 @@ export const LanguageGrid = ({
                                     value={searchQuery}
                                     onChange={e => setSearchQuery(e.target.value)}
                                     placeholder="Search languages..."
-                                    className="w-full pl-10 pr-10 py-2 bg-[#1f1f1f] border border-gray-600 rounded-lg text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8B5CF6] focus:border-[#8B5CF6] transition-all duration-200"
+                                    className="
+        w-full px-4 py-2 pl-10 rounded-lg bg-[#18181b] border-2 border-gray-700
+        focus:border-[#8B5CF6] focus:bg-[#23232b]
+        transition-all duration-200
+        text-gray-200 placeholder-gray-400
+        outline-none
+        shadow-sm focus:shadow-md
+        "
                                 />
                                 {searchQuery && (
                                     <button
@@ -159,14 +166,14 @@ export const LanguageGrid = ({
                                     setSelectedPreviewLang && setSelectedPreviewLang(null)
                                 }
                                 className={`relative flex flex-col items-start px-3 py-2 rounded-lg border text-left transition-all duration-200 
-                                    border-gray-700/50 cursor-pointer
-                                    ${
-                                        isSelected
-                                            ? 'bg-[#8B5CF6]/10 ring-2 ring-[#8B5CF6] shadow-lg'
-                                            : 'bg-primary/50 hover:bg-primary/70'
-                                    }
-                                    ${isActive ? 'ring-2 ring-[#8B5CF6]' : ''}
-                                `}
+                        border-gray-700/50 cursor-pointer
+                        ${
+                            isSelected
+                                ? 'bg-[#8B5CF6]/10 ring-2 ring-[#8B5CF6] shadow-lg'
+                                : 'bg-primary/50 hover:bg-primary/70'
+                        }
+                        ${isActive ? 'ring-2 ring-[#8B5CF6]' : ''}
+                    `}
                             >
                                 <span
                                     className="font-bold transition-colors duration-200"

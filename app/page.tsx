@@ -83,10 +83,26 @@ const translations = {
         'Notification.saved': 'Alterações salvas',
     },
 };
+import { useRouter } from 'next/navigation';
+import { auth } from './lib/firebaseClient';
+import { onAuthStateChanged, setPersistence, browserLocalPersistence } from 'firebase/auth';
+
 const LandingPage = () => {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const rafRef = useRef<number | null>(null);
+    const router = useRouter();
+
+    useEffect(() => {
+        // Ensure persistence for 14 days (default for browserLocalPersistence)
+        setPersistence(auth, browserLocalPersistence);
+        const unsub = onAuthStateChanged(auth, user => {
+            if (user) {
+                router.push('/translator');
+            }
+        });
+        return () => unsub();
+    }, [router]);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -549,14 +565,14 @@ const LandingPage = () => {
                         name="Free Plan"
                         price="0"
                         features={[
-                            'Translate up to 200 keys/month',
-                            '2 target languages per file',
+                            'Translate up to 100 keys/month',
+                            '3 target languages per file',
                             'No signup required',
                         ]}
                     />
                     <PricingCard
                         name="Pro Plan"
-                        price="12.99"
+                        price="13"
                         popular
                         gradient
                         features={[

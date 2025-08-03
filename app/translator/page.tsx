@@ -40,21 +40,26 @@ type HistoryItem = {
     createdAt?: { seconds: number; nanoseconds: number };
 };
 
-export default function TranslatorPage() {
-    /* ---------------- state */
+const FREE_TIER_KEY_LIMIT = 100;
 
-    const [profileOpen, setProfileOpen] = useState(false);
+export default function TranslatorPage() {
     const { user, loading: authLoading } = useAuth();
-    // console.log(user.subscription);
     const [keysThisMonth, setKeysThisMonth] = useState(0);
     const [showPaywall, setShowPaywall] = useState(false);
-    // const isPro = user?.subscription?.status === 'active';
+
+    // ADD THIS STATE:
+    const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
+
+    // Profile dropdown state
+    const [profileOpen, setProfileOpen] = useState(false);
+
+    // UPDATE THIS LINE:
+    const isPro = subscriptionStatus === 'active' || subscriptionStatus === 'trialing';
+
     const [translationId] = useState<string | null>(null);
-    const isPro = true;
+
     console.log(user?.uid);
-    const [selectedShortcuts, setSelectedShortcuts] = useState<Set<string>>(
-        new Set(['EN', 'IT', 'CS']),
-    );
+    const [selectedShortcuts, setSelectedShortcuts] = useState<Set<string>>(new Set(['IT', 'CS']));
     const [rows, setRows] = useState<{ key: string; value: string; context: string }[]>([
         { key: '', value: '', context: '' },
     ]);
@@ -108,6 +113,11 @@ export default function TranslatorPage() {
         if (!item || !item.translationResult) return;
 
         setTranslationResult(item.translationResult);
+        setKeyCount(
+            Object.keys(
+                item.translationResult?.[Object.keys(item.translationResult)[0] ?? ''] ?? {},
+            ).length,
+        );
 
         // Get all available language codes from the translation result
         const availableCodes = Object.keys(item.translationResult);
@@ -135,8 +145,8 @@ export default function TranslatorPage() {
                 next.delete(shortcut);
                 setLangLimitInfo(null);
             } else {
-                if (!isPro && next.size >= 2) {
-                    setLangLimitInfo('Upgrade to Pro to select more than 2 languages.');
+                if (!isPro && next.size >= 3) {
+                    setLangLimitInfo('Upgrade to Pro to select more than 3 languages.');
                     return prev;
                 }
                 next.add(shortcut);
@@ -342,10 +352,17 @@ export default function TranslatorPage() {
             }
 
             setTranslationResult(finalResult);
+            const allKeys = Object.keys(finalResult[targetCodes[0]] ?? {});
+            setKeyCount(allKeys.length);
             setLastTargetCodes(targetCodes);
             setSelectedLangTab(targetCodes[0] ?? null);
             setSelectedPreviewLang(targetCodes[0] ?? null);
-            setIsUserTranslation(true); // <-- Mark as user translation
+            setIsUserTranslation(true);
+
+            // Update keys_month in user's Firestore doc
+            await updateDoc(doc(db, 'users', user.uid), {
+                keys_month: keysThisMonth + allKeys.length,
+            });
         } catch (e) {
             console.error('[Translayte] Translation error:', e);
 
@@ -387,28 +404,29 @@ export default function TranslatorPage() {
             window.location.href = '/login';
             return;
         }
-        if (!isPro && keyCount > 200) {
+        if (!isPro && keyCount + keysThisMonth > FREE_TIER_KEY_LIMIT) {
             setShowPaywall(true);
-            toast.error('Free plan limit: 200 keys per month.');
+            toast.error(`Free plan limit: ${FREE_TIER_KEY_LIMIT} keys per month.`);
             return;
         }
         handleTranslate();
     };
 
+    // Stripe Firebase Extension checkout
     const goPro = async () => {
-        const user = auth.currentUser;
-        if (!user) {
-            // router.push('/login');
-            return;
-        }
-        const token = await user.getIdToken();
-        const res = await fetch('/api/stripe/checkout', {
+        if (!user) return;
+        // Call the Stripe extension's checkout function
+        const response = await fetch('/api/stripe/extension-checkout', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token }),
+            body: JSON.stringify({ uid: user.uid, email: user.email }),
         });
-        const { url } = await res.json();
-        window.location.href = url;
+        const { url } = await response.json();
+        if (url) {
+            window.location.href = url;
+        } else {
+            toast.error('Failed to start checkout.');
+        }
     };
 
     const [, setPresentUsers] = useState<
@@ -442,33 +460,79 @@ export default function TranslatorPage() {
             unsub();
         };
     }, [translationId, user]);
-    useEffect(() => {
-        if (!user || !user.uid) return; // ⬅️ wait for user
 
-        const unsub = onSnapshot(doc(db, 'users', user.uid), snap => {
-            setKeysThisMonth(snap.data()?.keys_month || 0);
+    // This single useEffect now handles user data (keys, subscription) and history
+    useEffect(() => {
+        if (!user || !user.uid) {
+            // Clear data if user logs out
+            setSubscriptionStatus(null);
+            setKeysThisMonth(0);
+            setHistory([]);
+            return;
+        }
+
+        // Listener for user-specific data (keys_month, subscription)
+        const userUnsub = onSnapshot(doc(db, 'users', user.uid), snap => {
+            const userData = snap.data();
+            setKeysThisMonth(userData?.keys_month || 0);
+
+            const sub = userData?.stripe_subscription;
+            // Correctly update the subscription status state
+            if (sub?.status) {
+                setSubscriptionStatus(sub.status);
+            } else {
+                setSubscriptionStatus(null);
+            }
         });
-        return () => unsub();
+
+        // Listener for translations history
+        setHistoryLoading(true);
+        const translationsUnsub = onSnapshot(
+            collection(db, 'translations'),
+            snap => {
+                const items = snap.docs
+                    .map(doc => {
+                        const data = doc.data() as HistoryItem;
+                        return {
+                            ...data,
+                            id: doc.id,
+                            fileName: typeof data.fileName === 'string' ? data.fileName : undefined,
+                        };
+                    })
+                    .filter(item => item.userId === user.uid)
+                    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+                setHistory(items);
+                setHistoryLoading(false);
+            },
+            () => {
+                setHistoryLoading(false);
+                toast.error('Failed to load translation history.');
+            },
+        );
+
+        // Cleanup both listeners on unmount or user change
+        return () => {
+            userUnsub();
+            translationsUnsub();
+        };
     }, [user]);
 
     useEffect(() => {
-        try {
-            const obj = safeParseJsonInput(jsonInput);
-            setKeyCount(obj ? Object.keys(obj).length : 0);
-            setCharCount(jsonInput.length);
-        } catch {
-            setKeyCount(0);
-            setCharCount(jsonInput.length);
-        }
-    }, [jsonInput]);
-
-    useEffect(() => {
-        if (mode === 'keys') {
+        if (mode === 'file') {
+            try {
+                const obj = safeParseJsonInput(jsonInput);
+                setKeyCount(obj ? Object.keys(obj).length : 0);
+                setCharCount(jsonInput.length);
+            } catch {
+                setKeyCount(0);
+                setCharCount(jsonInput.length);
+            }
+        } else if (mode === 'keys') {
             const validRows = rows.filter(r => r.key && r.value);
             setKeyCount(validRows.length);
             setCharCount(validRows.reduce((acc, row) => acc + row.value.length, 0));
         }
-    }, [rows, mode]);
+    }, [jsonInput, rows, mode]);
 
     useEffect(() => {
         if (!user || !user.uid) return;
@@ -535,9 +599,9 @@ export default function TranslatorPage() {
                     {user && (
                         <div className="text-sm text-gray-300 flex items-center gap-2">
                             <i className="fa-solid fa-key text-yellow-400" />
-                            {user.subscription?.status === 'active'
+                            {isPro
                                 ? 'Pro Plan — Unlimited'
-                                : `Free — ${keysThisMonth} / 200 keys`}
+                                : `Free — ${keysThisMonth} / ${FREE_TIER_KEY_LIMIT} keys`}
                         </div>
                     )}
 
@@ -998,15 +1062,15 @@ export default function TranslatorPage() {
                                             <span className="font-semibold text-yellow-200">
                                                 Translayte Pro
                                             </span>{' '}
-                                            to translate into more than 2 languages at once.
+                                            to translate into more than 3 languages at once.
                                         </div>
                                     </div>
-                                    <a
-                                        href="/pricing"
+                                    <button
+                                        onClick={goPro}
                                         className="ml-2 px-4 py-2 rounded-full bg-yellow-400 text-gray-900 font-semibold shadow hover:bg-yellow-300 transition"
                                     >
                                         Upgrade
-                                    </a>
+                                    </button>
                                 </div>
                             )}
                         </div>
@@ -1039,8 +1103,8 @@ export default function TranslatorPage() {
                             </div>
                         </div>
                         {showPaywall && (
-                            <div className="p-4 mb-4 bg-yellow-800 text-yellow-100 rounded">
-                                You’ve reached your free‐tier limit of 200 keys this month.{' '}
+                            <div className="p-4 mt-4 mb-4 bg-yellow-800 text-yellow-100 rounded-lg">
+                                You’ve reached your free‐tier limit of 100 keys this month.{' '}
                                 <button onClick={goPro} className="underline">
                                     Upgrade to Pro
                                 </button>{' '}
