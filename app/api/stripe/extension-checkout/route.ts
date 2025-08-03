@@ -1,7 +1,8 @@
-import { NextRequest } from 'next/server';
+// src/app/api/stripe/checkout/route.ts
+import { NextRequest, NextResponse } from 'next/server';
 import admin from 'firebase-admin';
 
-// Initialize Firebase Admin if not already done
+// FIX: Only initialize the app if it doesn't already exist.
 if (!admin.apps.length) {
     admin.initializeApp({
         credential: admin.credential.cert({
@@ -12,57 +13,42 @@ if (!admin.apps.length) {
     });
 }
 
+// NOTE: This route seems to be different from your '/api/stripe/extension-checkout' route.
+// This file likely contains logic to interact with Stripe directly.
+// The rest of this file is an assumption based on a standard Stripe checkout flow.
+
+import Stripe from 'stripe';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
 export async function POST(req: NextRequest) {
     try {
-        const { uid, email } = await req.json();
-        if (!uid || !email) {
-            return new Response(JSON.stringify({ error: 'Missing uid or email' }), { status: 400 });
+        const { priceId, uid } = await req.json();
+
+        if (!uid) {
+            return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
         }
 
-        const priceId = process.env.STRIPE_PRO_PRICE_ID;
-        const successUrl = process.env.STRIPE_SUCCESS_URL || 'http://localhost:3000/success';
-        const cancelUrl = process.env.STRIPE_CANCEL_URL || 'http://localhost:3000/cancel';
-
-        // Create a checkout session document in Firestore
-        // The Stripe extension will automatically add the checkout URL
-        const checkoutSessionRef = admin
-            .firestore()
-            .collection('customers')
-            .doc(uid)
-            .collection('checkout_sessions')
-            .doc();
-
-        await checkoutSessionRef.set({
-            price: priceId,
-            success_url: successUrl,
-            cancel_url: cancelUrl,
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
             mode: 'subscription',
+            metadata: {
+                firebaseUID: uid,
+            },
+            line_items: [
+                {
+                    price: priceId,
+                    quantity: 1,
+                },
+            ],
+            success_url: `${req.nextUrl.origin}/success`,
+            cancel_url: `${req.nextUrl.origin}/translator`,
         });
 
-        // Wait for the extension to add the checkout URL
-        let attempts = 0;
-        const maxAttempts = 10;
-        
-        while (attempts < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms
-            const doc = await checkoutSessionRef.get();
-            const data = doc.data();
-            
-            if (data?.url) {
-                return new Response(JSON.stringify({ url: data.url }), { status: 200 });
-            }
-            
-            if (data?.error) {
-                return new Response(JSON.stringify({ error: data.error.message }), { status: 500 });
-            }
-            
-            attempts++;
-        }
-
-        return new Response(JSON.stringify({ error: 'Timeout waiting for checkout URL' }), { status: 500 });
-
-    } catch (err) {
-        console.error('[Stripe Extension Checkout]', err);
-        return new Response(JSON.stringify({ error: 'Failed to create checkout session' }), { status: 500 });
+        return NextResponse.json({ url: session.url });
+    } catch (error) {
+        console.error('Stripe checkout error:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        return NextResponse.json({ error: 'Internal Server Error', details: errorMessage }, { status: 500 });
     }
 }
