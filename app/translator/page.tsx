@@ -15,6 +15,8 @@ import {
     setDoc,
     deleteDoc,
     updateDoc,
+    query,
+    where,
 } from 'firebase/firestore';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -471,18 +473,26 @@ export default function TranslatorPage() {
             return;
         }
 
-        // Listener for user-specific data (keys_month, subscription)
+        // Listener for user-specific data (keys_month)
         const userUnsub = onSnapshot(doc(db, 'users', user.uid), snap => {
             const userData = snap.data();
             setKeysThisMonth(userData?.keys_month || 0);
+        });
 
-            const sub = userData?.stripe_subscription;
-            // Correctly update the subscription status state
-            if (sub?.status) {
-                setSubscriptionStatus(sub.status);
-            } else {
+        // FIX: Listen to the correct collection for subscription status
+        const subscriptionsQuery = query(
+            collection(db, 'customers', user.uid, 'subscriptions'),
+            where('status', 'in', ['trialing', 'active']),
+        );
+
+        const subscriptionsUnsub = onSnapshot(subscriptionsQuery, snapshot => {
+            if (snapshot.empty) {
                 setSubscriptionStatus(null);
+                return;
             }
+            // We only expect one active subscription
+            const sub = snapshot.docs[0].data();
+            setSubscriptionStatus(sub.status);
         });
 
         // Listener for translations history
@@ -510,9 +520,10 @@ export default function TranslatorPage() {
             },
         );
 
-        // Cleanup both listeners on unmount or user change
+        // Cleanup all listeners on unmount or user change
         return () => {
             userUnsub();
+            subscriptionsUnsub();
             translationsUnsub();
         };
     }, [user]);
@@ -533,48 +544,6 @@ export default function TranslatorPage() {
             setCharCount(validRows.reduce((acc, row) => acc + row.value.length, 0));
         }
     }, [jsonInput, rows, mode]);
-
-    useEffect(() => {
-        if (!user || !user.uid) return;
-
-        // Listen for keys_this_month
-        const userUnsub = onSnapshot(doc(db, 'users', user.uid), snap => {
-            setKeysThisMonth(snap.data()?.keys_month || 0);
-        });
-
-        // Listen for translations history
-        setHistoryLoading(true);
-        const translationsUnsub = onSnapshot(
-            collection(db, 'translations'),
-            snap => {
-                const items = snap.docs
-                    .map(doc => {
-                        const data = doc.data() as HistoryItem;
-                        return {
-                            ...data,
-                            id: doc.id,
-                            fileName: typeof data.fileName === 'string' ? data.fileName : undefined,
-                        };
-                    })
-                    .filter(item => item.userId === user.uid)
-                    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-                setHistory(items);
-                setHistoryLoading(false);
-            },
-            () => {
-                setHistoryLoading(false);
-                toast.error('Failed to load translation history.');
-            },
-        );
-
-        // Cleanup both listeners on unmount or user changeconsole
-        console.log('ąaa');
-        console.log(history);
-        return () => {
-            userUnsub();
-            translationsUnsub();
-        };
-    }, [user]);
 
     type ViewTabKey = 'json' | 'table' | 'original' | 'all';
     const VIEW_TABS: { key: ViewTabKey; label: string }[] = [
