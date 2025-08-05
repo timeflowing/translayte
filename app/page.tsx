@@ -565,7 +565,7 @@ const LandingPage = () => {
                         name="Free Plan"
                         price="0"
                         features={[
-                            'Translate up to 100 keys/month',
+                            'Translate up to 69 keys/month',
                             '3 target languages per file',
                             'No credit card required',
                         ]}

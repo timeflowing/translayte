@@ -33,6 +33,7 @@ import { toast } from 'react-toastify';
 import ModeSwitcher from '../components/ModeSwitcher';
 import { DropZone } from '../components/DropZone';
 import { parseInput } from '../utils/inputParser';
+import ShareProjectModal from '../components/ShareModal';
 
 type HistoryItem = {
     id: string;
@@ -43,7 +44,7 @@ type HistoryItem = {
     createdAt?: { seconds: number; nanoseconds: number };
 };
 
-const FREE_TIER_KEY_LIMIT = 100;
+const FREE_TIER_KEY_LIMIT = 69;
 
 export default function TranslatorPage() {
     const { user, loading: authLoading } = useAuth();
@@ -54,6 +55,18 @@ export default function TranslatorPage() {
     // ADD THIS STATE:
     const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
 
+    // Add this state for the create project modal
+
+    // ...inside TranslatorPage component...
+    const [showShareModal, setShowShareModal] = useState(false);
+    const [shareEmails, setShareEmails] = useState<string[]>([]);
+    const [newShareEmail, setNewShareEmail] = useState('');
+    const [permissions, setPermissions] = useState<{
+        [email: string]: { view: boolean; edit: boolean; comment: boolean };
+    }>({});
+    const [shareLoading, setShareLoading] = useState(false);
+    const [shareError, setShareError] = useState<string | null>(null);
+    const [shareSuccess, setShareSuccess] = useState<string | null>(null);
     // Profile dropdown state
     const [profileOpen, setProfileOpen] = useState(false);
 
@@ -1125,7 +1138,7 @@ export default function TranslatorPage() {
                         </div>
                         {showPaywall && (
                             <div className="p-4 mt-4 mb-4 bg-yellow-800 text-yellow-100 rounded-lg">
-                                You’ve reached your free‐tier limit of 100 keys this month.{' '}
+                                You’ve reached your free‐tier limit of 69 keys this month.{' '}
                                 <button onClick={goPro} className="underline">
                                     Upgrade to Pro
                                 </button>{' '}
@@ -1133,7 +1146,11 @@ export default function TranslatorPage() {
                             </div>
                         )}
                         <div className="flex flex-col sm:flex-row gap-4 mt-4">
-                            <TranslateButton onClick={tryTranslate} loading={isTranslating} />
+                            <TranslateButton
+                                onClick={tryTranslate}
+                                loading={isTranslating}
+                                isRetranslate={!!translationResult}
+                            />
                         </div>
 
                         {/* --- Translation History Section --- */}
@@ -1152,14 +1169,74 @@ export default function TranslatorPage() {
                                 />
                             </div>
                         )}
+                        {isPro && (
+                            <button
+                                className="w-full mt-4 group relative inline-flex items-center justify-center font-semibold px-4 py-2 rounded-lg border border-gray-700 bg-[#191919]/70 backdrop-blur-sm text-white hover:bg-[#232323]/80 transition"
+                                onClick={() => setShowShareModal(true)}
+                            >
+                                <span className="absolute inset-0 rounded-lg pointer-events-none" />
+                                <span className="relative z-10">+ Create & Share Project</span>
+                            </button>
+                        )}
                     </aside>
                 </div>
             </main>
+
+            {/* Share Project Modal */}
+            {showShareModal && isPro && (
+                <ShareProjectModal
+                    onClose={() => setShowShareModal(false)}
+                    emails={shareEmails}
+                    setEmails={setShareEmails}
+                    permissions={permissions}
+                    setPermissions={setPermissions}
+                    loading={shareLoading}
+                    error={shareError}
+                    success={shareSuccess}
+                    onShare={async () => {
+                        setShareLoading(true);
+                        setShareError(null);
+                        setShareSuccess(null);
+
+                        try {
+                            // Here, you would typically send the share request to your server
+                            // For demonstration, we'll just simulate success/failure
+                            await new Promise((resolve, reject) => {
+                                setTimeout(() => {
+                                    if (Math.random() > 0.2) {
+                                        resolve(null);
+                                    } else {
+                                        reject(new Error('Failed to share'));
+                                    }
+                                }, 1000);
+                            });
+
+                            setShareSuccess('Project shared successfully!');
+                            setShareEmails([]);
+                            setPermissions({});
+                        } catch (error) {
+                            setShareError(error instanceof Error ? error.message : String(error));
+                        } finally {
+                            setShareLoading(false);
+                        }
+                    }}
+                    newEmail={newShareEmail}
+                    setNewEmail={setNewShareEmail}
+                />
+            )}
         </>
     );
 }
 
-const TranslateButton = ({ onClick, loading }: { onClick: () => void; loading: boolean }) => (
+const TranslateButton = ({
+    onClick,
+    loading,
+    isRetranslate,
+}: {
+    onClick: () => void;
+    loading: boolean;
+    isRetranslate?: boolean;
+}) => (
     <button
         onClick={onClick}
         disabled={loading}
@@ -1169,8 +1246,11 @@ const TranslateButton = ({ onClick, loading }: { onClick: () => void; loading: b
         <span className="relative z-10">
             {loading ? (
                 <>
-                    <i className="fa-solid fa-spinner fa-spin mr-2" /> Translating…
+                    <i className="fa-solid fa-spinner fa-spin mr-2" />{' '}
+                    {isRetranslate ? 'Retranslating…' : 'Translating…'}
                 </>
+            ) : isRetranslate ? (
+                'Retranslate Text'
             ) : (
                 'Translate'
             )}

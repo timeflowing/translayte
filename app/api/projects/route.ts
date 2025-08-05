@@ -1,5 +1,7 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { adminAuth, adminDB } from '@/app/lib/firebaseAdmin';
 
+// GET /api/projects
 export async function GET(req: NextRequest) {
   console.log('🔄 Projects API called');
   
@@ -116,82 +118,34 @@ export async function GET(req: NextRequest) {
   }
 }
 
+// POST /api/projects
 export async function POST(req: NextRequest) {
-  console.log('🔄 Create Project API called');
-  
-  try {
-    // Import Firebase Admin
-    const { adminAuth, adminDB } = await import('../../lib/firebaseAdmin');
+    console.log('🔄 Create Project API called');
     
-    // Get authorization header
-    const authHeader = req.headers.get('authorization');
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return new Response(
-        JSON.stringify({ error: 'Missing authorization token' }), 
-        { 
-          status: 401,
-          headers: { 'Content-Type': 'application/json' }
+    try {
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader) {
+            return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
         }
-      );
+        const idToken = authHeader.replace('Bearer ', '');
+        const decodedToken = await adminAuth.verifyIdToken(idToken);
+        const userId = decodedToken.uid;
+
+        const { name, translation, orgId } = await req.json();
+
+        const docRef = await adminDB.collection('projects').add({
+            owner: userId,
+            orgId,
+            name,
+            translation,
+            sharedWith: [],
+            permissions: {},
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        });
+
+        return NextResponse.json({ id: docRef.id });
+    } catch {
+        return NextResponse.json({ error: 'Failed to create project' }, { status: 500 });
     }
-    
-    const idToken = authHeader.replace('Bearer ', '');
-    
-    // Verify the token
-    const decoded = await adminAuth.verifyIdToken(idToken);
-    
-    // Get request body
-    const { name, description, sourceLanguage, targetLanguages } = await req.json();
-    
-    if (!name || !sourceLanguage || !targetLanguages || targetLanguages.length === 0) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required fields' }), 
-        { 
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        }
-      );
-    }
-    
-    // Create new project
-    const projectData = {
-      name,
-      description: description || '',
-      sourceLanguage,
-      targetLanguages,
-      ownerId: decoded.uid,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      translations: {},
-      settings: {
-        allowSharing: true,
-        requireApproval: false
-      }
-    };
-    
-    const projectRef = await adminDB.collection('projects').add(projectData);
-    
-    console.log('✅ Project created:', projectRef.id);
-    
-    return new Response(JSON.stringify({
-      id: projectRef.id,
-      ...projectData
-    }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
-    
-  } catch (error: unknown) {
-    console.error('💥 Create project error:', error);
-    return new Response(
-      JSON.stringify({ 
-        error: 'Internal server error',
-        details: typeof error === 'object' && error !== null && 'message' in error ? (error as { message?: string }).message : String(error)
-      }), 
-      { 
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      }
-    );
-  }
 }

@@ -158,7 +158,7 @@ const ProfilePage = () => {
     const limits =
         plan === 'pro'
             ? { translations: 'Unlimited', api: 'Enabled', support: 'Priority' }
-            : { translations: '1000/month', api: 'Trial only', support: 'Standard' };
+            : { translations: '69/month', api: 'Trial only', support: 'Standard' };
 
     return (
         <div className="relative min-h-screen bg-gradient-to-br from-[#181428] to-[#101014]">

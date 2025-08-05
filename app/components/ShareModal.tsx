@@ -1,96 +1,158 @@
 'use client';
-import React, { useState } from 'react';
+import React from 'react';
 
-interface ShareUser {
-    uid: string;
-    email: string;
-    canEdit: boolean;
-}
-
-export default function ShareModal({
-    open,
+export default function ShareProjectModal({
     onClose,
-
-    sharedWith,
+    emails,
+    setEmails,
+    permissions,
+    setPermissions,
+    loading,
+    error,
+    success,
     onShare,
+    newEmail,
+    setNewEmail,
 }: {
-    open: boolean;
     onClose: () => void;
-    translationId: string;
-    sharedWith: ShareUser[];
-    onShare: (users: ShareUser[]) => void;
+    emails: string[];
+    setEmails: (emails: string[]) => void;
+    permissions: { [email: string]: { view: boolean; edit: boolean; comment: boolean } };
+    setPermissions: (p: {
+        [email: string]: { view: boolean; edit: boolean; comment: boolean };
+    }) => void;
+    loading: boolean;
+    error: string | null;
+    success: string | null;
+    onShare: () => void;
+    newEmail: string;
+    setNewEmail: (e: string) => void;
 }) {
-    const [email, setEmail] = useState('');
-    const [canEdit, setCanEdit] = useState(false);
-    const [pending, setPending] = useState(false);
-
-    const handleAdd = async () => {
-        setPending(true);
-        // TODO: Replace with your user lookup logic
-        const user = await fetch(`/api/userByEmail?email=${encodeURIComponent(email)}`).then(res =>
-            res.json(),
-        );
-        if (user?.uid) {
-            onShare([...sharedWith, { uid: user.uid, email, canEdit }]);
-            setEmail('');
-            setCanEdit(false);
+    // Add new email with default permissions
+    const handleAddEmail = () => {
+        if (newEmail && !emails.includes(newEmail) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+            setEmails([...emails, newEmail]);
+            setPermissions({
+                ...permissions,
+                [newEmail]: { view: true, edit: false, comment: false },
+            });
+            setNewEmail('');
         }
-        setPending(false);
     };
 
-    if (!open) return null;
+    // Remove user
+    const handleRemoveEmail = (email: string) => {
+        setEmails(emails.filter(e => e !== email));
+        const newPerm = { ...permissions };
+        delete newPerm[email];
+        setPermissions(newPerm);
+    };
+
+    // Toggle permission
+    const handleTogglePermission = (email: string, perm: keyof (typeof permissions)[string]) => {
+        setPermissions({
+            ...permissions,
+            [email]: {
+                ...permissions[email],
+                [perm]: !permissions[email][perm],
+            },
+        });
+    };
 
     return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-            <div className="bg-[#18181b] rounded-xl p-6 w-full max-w-md border border-gray-700">
-                <h2 className="text-lg font-bold mb-4 text-purple-300">Share Translation</h2>
-                <div className="mb-4">
-                    <input
-                        className="w-full px-3 py-2 rounded bg-[#222] border border-gray-700 text-gray-200"
-                        placeholder="User email"
-                        value={email}
-                        onChange={e => setEmail(e.target.value)}
-                        disabled={pending}
-                    />
-                    <label className="flex items-center mt-2 gap-2 text-sm text-gray-300">
-                        <input
-                            type="checkbox"
-                            checked={canEdit}
-                            onChange={e => setCanEdit(e.target.checked)}
-                            disabled={pending}
-                        />
-                        Can edit
-                    </label>
-                    <button
-                        className="mt-3 px-4 py-2 rounded bg-purple-700 text-white text-sm hover:bg-purple-800"
-                        onClick={handleAdd}
-                        disabled={pending || !email}
-                    >
-                        Add
-                    </button>
-                </div>
-                <div>
-                    <h3 className="text-sm font-semibold text-gray-400 mb-2">Shared With:</h3>
-                    <ul>
-                        {sharedWith.map(u => (
-                            <li key={u.uid} className="flex items-center gap-2 mb-1">
-                                <span className="text-gray-200">{u.email}</span>
-                                <span
-                                    className={`text-xs ${
-                                        u.canEdit ? 'text-green-400' : 'text-gray-400'
-                                    }`}
-                                >
-                                    {u.canEdit ? 'Can edit' : 'View only'}
-                                </span>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+            <div className="bg-[#232136] rounded-xl shadow-lg p-8 min-w-[350px] max-w-[95vw] relative">
                 <button
-                    className="mt-4 px-4 py-2 rounded bg-gray-700 text-white text-sm hover:bg-gray-800"
+                    className="absolute top-2 right-2 text-gray-400 hover:text-[#A78BFA] text-xl"
                     onClick={onClose}
+                    aria-label="Close"
                 >
-                    Close
+                    &times;
+                </button>
+                <h2 className="text-2xl font-bold mb-4 text-[#A78BFA] text-center">
+                    Share Project
+                </h2>
+                <div className="mb-4">
+                    <label className="block text-sm text-gray-300 mb-2">Invite user by email</label>
+                    <div className="flex gap-2">
+                        <input
+                            type="email"
+                            value={newEmail}
+                            onChange={e => setNewEmail(e.target.value)}
+                            placeholder="user@email.com"
+                            className="flex-1 px-4 py-2 rounded-lg bg-[#191919] text-white border border-[#A78BFA]/60"
+                        />
+                        <button
+                            className="px-4 py-2 rounded-lg bg-[#A78BFA] hover:bg-[#7C5AE6] text-white font-semibold transition"
+                            onClick={handleAddEmail}
+                            disabled={!newEmail || emails.includes(newEmail)}
+                        >
+                            Add
+                        </button>
+                    </div>
+                </div>
+                {emails.length > 0 && (
+                    <div className="mb-4">
+                        <label className="block text-sm text-gray-300 mb-2">Shared with:</label>
+                        <div className="space-y-2">
+                            {emails.map(email => (
+                                <div
+                                    key={email}
+                                    className="flex flex-col md:flex-row md:items-center justify-between bg-[#191919] rounded-lg px-4 py-2"
+                                >
+                                    <span className="text-white mb-2 md:mb-0">{email}</span>
+                                    <div className="flex gap-2 items-center">
+                                        <label className="flex items-center gap-1 text-gray-300">
+                                            <input
+                                                type="checkbox"
+                                                checked={permissions[email]?.view || false}
+                                                onChange={() =>
+                                                    handleTogglePermission(email, 'view')
+                                                }
+                                            />
+                                            View
+                                        </label>
+                                        <label className="flex items-center gap-1 text-gray-300">
+                                            <input
+                                                type="checkbox"
+                                                checked={permissions[email]?.edit || false}
+                                                onChange={() =>
+                                                    handleTogglePermission(email, 'edit')
+                                                }
+                                            />
+                                            Edit
+                                        </label>
+                                        <label className="flex items-center gap-1 text-gray-300">
+                                            <input
+                                                type="checkbox"
+                                                checked={permissions[email]?.comment || false}
+                                                onChange={() =>
+                                                    handleTogglePermission(email, 'comment')
+                                                }
+                                            />
+                                            Comment
+                                        </label>
+                                        <button
+                                            className="text-gray-400 hover:text-red-400 ml-2"
+                                            onClick={() => handleRemoveEmail(email)}
+                                            title="Remove"
+                                        >
+                                            <i className="fa-solid fa-xmark" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+                {error && <div className="text-red-400 mb-2">{error}</div>}
+                {success && <div className="text-green-400 mb-2">{success}</div>}
+                <button
+                    className="w-full py-2 px-6 rounded-lg bg-[#A78BFA] hover:bg-[#7C5AE6] text-white font-semibold transition mt-4"
+                    onClick={onShare}
+                    disabled={loading || emails.length === 0}
+                >
+                    {loading ? 'Sharing...' : 'Share Project'}
                 </button>
             </div>
         </div>
