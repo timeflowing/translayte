@@ -10,9 +10,11 @@ interface Entry {
 export default function KeyValueContextInput({
     onChange,
     rows: initialRows,
+    disableDeleteFirstRow = false,
 }: {
     onChange: (entries: Entry[]) => void;
     rows: Entry[];
+    disableDeleteFirstRow?: boolean;
 }) {
     const [rows, setRows] = useState<Entry[]>(initialRows);
 
@@ -70,13 +72,15 @@ export default function KeyValueContextInput({
                             value={row.context}
                             onChange={e => updateRow(index, 'context', e.target.value)}
                         />
-                        <button
-                            onClick={() => removeRow(index)}
-                            className="text-sm text-gray-400 hover:text-red-500 mt-2 md:mt-0"
-                            title="Remove row"
-                        >
-                            <i className="fa-solid fa-xmark" />
-                        </button>
+                        {!(disableDeleteFirstRow && index === 0) && (
+                            <button
+                                onClick={() => removeRow(index)}
+                                className="text-sm text-gray-400 hover:text-red-500 mt-2 md:mt-0"
+                                title="Remove row"
+                            >
+                                <i className="fa-solid fa-xmark" />
+                            </button>
+                        )}
                     </div>
                 ))}
             </div>

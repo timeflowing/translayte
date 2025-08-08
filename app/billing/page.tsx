@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../lib/firebaseClient';
 
-// Simple navigation bar for app pages
 const NavigationBar = () => (
     <nav className="w-full bg-[#232136] border-b border-[#8B5CF6]/20 py-3 px-6 flex items-center justify-between mb-8 rounded-b-xl shadow-lg">
         <div className="flex items-center gap-4">
@@ -55,8 +54,7 @@ const BillingPage = () => {
     useEffect(() => {
         if (!user) return;
         setLoading(true);
-        // Use accessToken for Firebase user
-        // @ts-expect-error: accessToken is available on user object from react-firebase-hooks
+        // @ts-expect-error: accessToken is available
         const accessToken = user?.accessToken || user?.stsTokenManager?.accessToken;
         fetch('/api/billing', {
             headers: {
@@ -100,29 +98,14 @@ const BillingPage = () => {
                             <div className="mb-8">
                                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                                     <div>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span
-                                                className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
-                                                    billing?.subscription?.plan === 'Pro'
-                                                        ? 'bg-[#A78BFA]/20 text-[#A78BFA]'
-                                                        : 'bg-gray-700 text-gray-300'
-                                                }`}
-                                            >
-                                                {billing?.subscription?.plan || 'Free'}
-                                            </span>
-                                            {billing?.subscription?.plan === 'Pro' && (
-                                                <span className="inline-block bg-[#A78BFA] text-white px-2 py-1 rounded-full text-xs font-bold">
-                                                    PRO
-                                                </span>
-                                            )}
-                                        </div>
+                                        <div className="flex items-center gap-2 mb-1"></div>
                                         <div className="flex items-center gap-2 text-sm text-gray-300">
                                             Status:{' '}
                                             <span
-                                                className={`font-bold px-2 py-1 rounded ${
+                                                className={`font-bold px-2 py-1 rounded border ${
                                                     billing?.subscription?.status === 'active'
-                                                        ? 'bg-green-700 text-green-200'
-                                                        : 'bg-gray-700 text-gray-300'
+                                                        ? 'text-green-300 border-green-700'
+                                                        : 'text-gray-300 border-gray-700'
                                                 }`}
                                             >
                                                 {billing?.subscription?.status || 'none'}
@@ -139,7 +122,7 @@ const BillingPage = () => {
                                     </div>
                                     {billing?.subscription?.status === 'active' && (
                                         <button
-                                            className="py-2 px-6 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold transition flex items-center gap-2"
+                                            className="py-2 px-6 rounded-lg bg-transparent border border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-white font-semibold transition flex items-center gap-2"
                                             onClick={handleCancel}
                                         >
                                             <svg
@@ -232,10 +215,10 @@ const BillingPage = () => {
                                                             </td>
                                                             <td className="py-2 px-4">
                                                                 <span
-                                                                    className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                                                    className={`px-2 py-1 rounded-full text-xs font-semibold border ${
                                                                         inv.status === 'paid'
-                                                                            ? 'bg-green-700 text-green-200'
-                                                                            : 'bg-gray-700 text-gray-300'
+                                                                            ? 'text-green-300 border-green-700'
+                                                                            : 'text-gray-300 border-gray-700'
                                                                     }`}
                                                                 >
                                                                     {inv.status}
@@ -262,9 +245,6 @@ const BillingPage = () => {
                                 )}
                             </div>
                             <div className="mt-6 text-xs text-gray-500 text-center">
-                                <span className="inline-block bg-[#232136] px-3 py-1 rounded-full text-[#A78BFA] font-semibold mr-2">
-                                    Legal
-                                </span>
                                 By subscribing you agree to our{' '}
                                 <Link href="/privacy" className="underline hover:text-[#A78BFA]">
                                     Privacy Policy

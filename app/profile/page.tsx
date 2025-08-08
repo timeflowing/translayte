@@ -67,7 +67,6 @@ const ProfilePage = () => {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
-    console.log(firebaseUser);
     // Load firebase user and profile from Firestore
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, async user => {
@@ -108,7 +107,7 @@ const ProfilePage = () => {
     }, [profile]);
 
     const handleField = (k: string, v: string) => setFields(f => ({ ...f, [k]: v }));
-    console.log(firebaseUser);
+
     // Save handler (profile to Firestore, displayName to Firebase)
     async function handleSave(e: React.FormEvent) {
         e.preventDefault();

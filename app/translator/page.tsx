@@ -1,4 +1,69 @@
 'use client';
+// Simple modal for selecting a project from history
+function SelectProjectModal({
+    history,
+    onSelect,
+    onClose,
+}: {
+    history: HistoryItem[];
+    onSelect: (id: string) => void;
+    onClose: () => void;
+}) {
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+            <div className="bg-[#18132a] border-2 border-[#8B5CF6] rounded-2xl p-7 w-full max-w-md shadow-2xl relative animate-fadeIn">
+                <h2 className="text-2xl font-extrabold text-white mb-5 flex items-center gap-2">
+                    <span className="inline-block w-2 h-6 rounded bg-gradient-to-b from-[#8B5CF6] to-[#7C3AED] mr-2" />
+                    Select a Project to Share
+                </h2>
+                <div className="max-h-64 overflow-y-auto divide-y divide-[#2a1e4a] rounded-lg bg-[#19132a]/60 border border-[#2a1e4a] mb-2">
+                    {history.length === 0 ? (
+                        <div className="text-gray-400 text-center py-10">
+                            <i className="fa-regular fa-folder-open text-3xl text-[#8B5CF6] mb-3" />
+                            <div>No projects found in your history.</div>
+                        </div>
+                    ) : (
+                        history.map(item => (
+                            <button
+                                key={item.id}
+                                className="w-full text-left px-4 py-3 transition-all rounded-lg flex flex-col mb-1 border-2 border-transparent hover:border-[#8B5CF6] hover:bg-[#22184a]/80 focus:outline-none focus:ring-2 focus:ring-[#8B5CF6] group"
+                                onClick={() => onSelect(item.id)}
+                            >
+                                <span className="font-semibold text-white group-hover:text-[#a78bfa] transition-colors">
+                                    {item.fileName || 'Untitled'}
+                                </span>
+                                <span className="text-xs text-gray-400 group-hover:text-[#c4b5fd] transition-colors">
+                                    {item.id}
+                                </span>
+                            </button>
+                        ))
+                    )}
+                </div>
+                <button
+                    className="mt-6 w-full px-4 py-2 bg-gradient-to-r from-[#8B5CF6] to-[#7C3AED] text-white rounded-lg font-bold shadow-lg hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#8B5CF6] transition-all text-lg"
+                    onClick={onClose}
+                >
+                    Cancel
+                </button>
+                <style jsx>{`
+                    @keyframes fadeIn {
+                        from {
+                            opacity: 0;
+                            transform: scale(0.97);
+                        }
+                        to {
+                            opacity: 1;
+                            transform: scale(1);
+                        }
+                    }
+                    .animate-fadeIn {
+                        animation: fadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+                    }
+                `}</style>
+            </div>
+        </div>
+    );
+}
 import React, { useState, ChangeEvent, useEffect } from 'react';
 import { useRouter } from 'next/navigation'; // <-- Add this import
 import '@fortawesome/fontawesome-free/css/all.min.css';
@@ -31,6 +96,7 @@ import { LanguageGrid } from '../components/LanguageGrid';
 import { HistoryAside } from '../components/HistoryAside'; // Import the new component
 import { toast } from 'react-toastify';
 import ModeSwitcher from '../components/ModeSwitcher';
+import NewProjectModal from '../components/NewProjectModal';
 import { DropZone } from '../components/DropZone';
 import { parseInput } from '../utils/inputParser';
 import ShareProjectModal from '../components/ShareModal';
@@ -59,23 +125,16 @@ export default function TranslatorPage() {
 
     // ...inside TranslatorPage component...
     const [showShareModal, setShowShareModal] = useState(false);
-    const [shareEmails, setShareEmails] = useState<string[]>([]);
-    const [newShareEmail, setNewShareEmail] = useState('');
-    const [permissions, setPermissions] = useState<{
-        [email: string]: { view: boolean; edit: boolean; comment: boolean };
-    }>({});
-    const [shareLoading, setShareLoading] = useState(false);
-    const [shareError, setShareError] = useState<string | null>(null);
-    const [shareSuccess, setShareSuccess] = useState<string | null>(null);
     // Profile dropdown state
     const [profileOpen, setProfileOpen] = useState(false);
 
     // UPDATE THIS LINE:
     const isPro = subscriptionStatus === 'active' || subscriptionStatus === 'trialing';
 
-    const [translationId] = useState<string | null>(null);
+    const [translationId, setTranslationId] = useState<string | null>(null);
+    const [showSelectProjectModal, setShowSelectProjectModal] = useState(false);
+    const [showNewProjectModal, setShowNewProjectModal] = useState(false);
 
-    console.log(user?.uid);
     const [selectedShortcuts, setSelectedShortcuts] = useState<Set<string>>(new Set(['IT', 'CS']));
     const [rows, setRows] = useState<{ key: string; value: string; context: string }[]>([
         { key: '', value: '', context: '' },
@@ -302,14 +361,10 @@ export default function TranslatorPage() {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [translationResult]);
-    useEffect(() => {
-        console.log('User:', user);
-    }, [user]);
+
     /* ---------------- translate ---------------- */
     const handleTranslate = async () => {
-        console.log(isTranslating);
-
-        setIsTranslating(true); // <-- Start loading effect
+        setIsTranslating(true);
 
         if (mode === 'keys') {
             const kv = Object.fromEntries(
@@ -327,14 +382,12 @@ export default function TranslatorPage() {
 
         if (targetCodes.length === 0) return;
 
-        // Check if user is authenticated
         if (!user) {
             alert('Please log in to translate');
             window.location.href = '/login';
             return;
         }
 
-        /* ---- build payload ---- */
         const payload =
             mode === 'file'
                 ? (() => {
@@ -355,14 +408,10 @@ export default function TranslatorPage() {
         if (!payload) return;
 
         try {
-            // Wait a moment to ensure Firebase auth is ready
             await new Promise(resolve => setTimeout(resolve, 100));
 
-            // Make a single API call for all languages
             const translations = await translateBatch(payload, targetCodes, 'en_XX');
 
-            // The result is already in the format { langCode: { key: value } }
-            // We just need to flatten each language's result for display
             const finalResult: Record<string, Record<string, string>> = {};
             for (const langCode in translations) {
                 finalResult[langCode] = translations[langCode];
@@ -376,10 +425,31 @@ export default function TranslatorPage() {
             setSelectedPreviewLang(targetCodes[0] ?? null);
             setIsUserTranslation(true);
 
-            // Update keys_month in user's Firestore doc
             await updateDoc(doc(db, 'users', user.uid), {
                 keys_month: keysThisMonth + allKeys.length,
             });
+
+            if (translationId) {
+                // Update current project
+                await updateDoc(doc(db, 'translations', translationId), {
+                    fileName: fileName ?? 'Untitled',
+                    sourceLanguage: 'EN',
+                    targetLanguages: Array.from(selectedShortcuts),
+                    translationResult: finalResult,
+                    updatedAt: serverTimestamp(),
+                });
+            } else {
+                // Create new project
+                const docRef = await addDoc(collection(db, 'translations'), {
+                    userId: user.uid,
+                    fileName: fileName ?? 'Untitled',
+                    sourceLanguage: 'EN',
+                    targetLanguages: Array.from(selectedShortcuts),
+                    translationResult: finalResult,
+                    createdAt: serverTimestamp(),
+                });
+                setTranslationId(docRef.id);
+            }
         } catch (e) {
             console.error('[Translayte] Translation error:', e);
 
@@ -399,7 +469,7 @@ export default function TranslatorPage() {
                 alert('Translation failed. Please try again.');
             }
         } finally {
-            setIsTranslating(false); // <-- Stop loading effect
+            setIsTranslating(false);
         }
     };
 
@@ -424,6 +494,14 @@ export default function TranslatorPage() {
         if (!isPro && keyCount + keysThisMonth > FREE_TIER_KEY_LIMIT) {
             setShowPaywall(true);
             toast.error(`Free plan limit: ${FREE_TIER_KEY_LIMIT} keys per month.`);
+            return;
+        }
+        // Prevent translation if input area is empty
+        if (
+            (mode === 'file' && (!jsonInput || jsonInput.trim() === '')) ||
+            (mode === 'keys' && rows.filter(r => r.key && r.value).length === 0)
+        ) {
+            toast.error('Please enter text or key-value pairs to translate.');
             return;
         }
         handleTranslate();
@@ -453,9 +531,12 @@ export default function TranslatorPage() {
     useEffect(() => {
         if (!translationId || !user) return;
         const presenceRef = doc(db, 'translations', translationId, 'presence', user.uid);
+        // Ensure displayName is never undefined for Firestore
+        const safeDisplayName =
+            user.displayName || (user.email ? user.email.split('@')[0] : 'User');
         setDoc(presenceRef, {
             uid: user.uid,
-            displayName: user.displayName,
+            displayName: safeDisplayName,
             isEditing: false,
             lastActive: Date.now(),
         });
@@ -512,17 +593,28 @@ export default function TranslatorPage() {
 
         // Listener for translations history
         setHistoryLoading(true);
+
         const translationsUnsub = onSnapshot(
-            collection(db, 'translations'),
+            query(collection(db, 'translations'), where('userId', '==', user.uid)),
             snap => {
                 const items = snap.docs
                     .map(doc => {
-                        const data = doc.data() as HistoryItem;
+                        // Define a type for the Firestore document data
+                        type TranslationDoc = HistoryItem & { title?: string };
+                        const raw = doc.data() as TranslationDoc;
+                        // Support both 'title' and 'fileName' for backward compatibility
+                        let name = undefined;
+                        if (typeof raw.title === 'string' && raw.title.length > 0) {
+                            name = raw.title;
+                        } else if (typeof raw.fileName === 'string' && raw.fileName.length > 0) {
+                            name = raw.fileName;
+                        }
+                        // Spread all fields so userId and createdAt are present
                         return {
-                            ...data,
+                            ...raw,
                             id: doc.id,
-                            fileName: typeof data.fileName === 'string' ? data.fileName : undefined,
-                        };
+                            fileName: name,
+                        } as HistoryItem;
                     })
                     .filter(item => item.userId === user.uid)
                     .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
@@ -566,6 +658,32 @@ export default function TranslatorPage() {
         { key: 'table', label: 'Table' },
         { key: 'original', label: 'Original' },
     ];
+    // Handler for creating a new project
+    const handleCreateProject = async (name: string, users: string[]) => {
+        if (!user) {
+            toast.error('You must be logged in to create a project.');
+            return;
+        }
+        try {
+            const docRef = await addDoc(collection(db, 'translations'), {
+                userId: user.uid,
+                fileName: name,
+                createdAt: serverTimestamp(),
+                sharedWith: users,
+            });
+            setTranslationId(docRef.id);
+            setIsUserTranslation(true); // ✅ Mark project as active
+            setFileName(name);
+            setRows([{ key: '', value: '', context: '' }]);
+            setJsonInput('');
+            setTranslationResult(null);
+            setShowNewProjectModal(false);
+            toast.success('Project created!');
+        } catch {
+            toast.error('Failed to create project.');
+        }
+    };
+
     return (
         <>
             {/* background layer */}
@@ -636,7 +754,11 @@ export default function TranslatorPage() {
                     {/* ------------ upload / keys column ------------ */}
                     <section className="w-full lg:w-9/12 mb-10 lg:mb-0">
                         {/* mode switch */}
-                        <ModeSwitcher mode={mode} setMode={setMode} />
+                        <ModeSwitcher
+                            mode={mode}
+                            setMode={setMode}
+                            onCreateProject={() => setShowNewProjectModal(true)}
+                        />
 
                         <div className="relative mt-4">
                             {/* This div blurs and disables inputs for logged-out users */}
@@ -1031,6 +1153,7 @@ export default function TranslatorPage() {
                                         onChange={newRows => {
                                             setRows(newRows);
                                         }}
+                                        disableDeleteFirstRow
                                     />
                                 ) : null}
                             </div>
@@ -1158,7 +1281,7 @@ export default function TranslatorPage() {
                             <div className="bg-[#191919]/70 backdrop-blur-sm rounded-lg p-4 mt-4">
                                 <h3 className="text-base font-semibold text-white mb-3 flex items-center gap-2">
                                     <i className="fa-solid fa-clock-rotate-left text-[#8B5CF6]" />
-                                    History
+                                    Project History
                                 </h3>
                                 <HistoryAside
                                     history={history}
@@ -1171,57 +1294,56 @@ export default function TranslatorPage() {
                         )}
                         {isPro && (
                             <button
-                                className="w-full mt-4 group relative inline-flex items-center justify-center font-semibold px-4 py-2 rounded-lg border border-gray-700 bg-[#191919]/70 backdrop-blur-sm text-white hover:bg-[#232323]/80 transition"
-                                onClick={() => setShowShareModal(true)}
+                                className="w-full mt-4 group relative inline-flex items-center justify-center font-semibold px-4 py-2 rounded-lg border border-gray-800 bg-[#232323]/60 backdrop-blur-sm text-gray-400 hover:bg-[#232323]/80 hover:text-white transition"
+                                onClick={() => {
+                                    if (translationId) {
+                                        setShowShareModal(true);
+                                    } else {
+                                        setShowSelectProjectModal(true);
+                                    }
+                                }}
                             >
                                 <span className="absolute inset-0 rounded-lg pointer-events-none" />
-                                <span className="relative z-10">+ Create & Share Project</span>
+                                <span className="relative z-10 flex items-center gap-2">
+                                    <i className="fa-solid fa-share-nodes text-gray-500 group-hover:text-white transition-colors text-sm" />
+                                    Share Project
+                                </span>
                             </button>
                         )}
                     </aside>
                 </div>
             </main>
 
-            {/* Share Project Modal */}
-            {showShareModal && isPro && (
-                <ShareProjectModal
-                    onClose={() => setShowShareModal(false)}
-                    emails={shareEmails}
-                    setEmails={setShareEmails}
-                    permissions={permissions}
-                    setPermissions={setPermissions}
-                    loading={shareLoading}
-                    error={shareError}
-                    success={shareSuccess}
-                    onShare={async () => {
-                        setShareLoading(true);
-                        setShareError(null);
-                        setShareSuccess(null);
-
-                        try {
-                            // Here, you would typically send the share request to your server
-                            // For demonstration, we'll just simulate success/failure
-                            await new Promise((resolve, reject) => {
-                                setTimeout(() => {
-                                    if (Math.random() > 0.2) {
-                                        resolve(null);
-                                    } else {
-                                        reject(new Error('Failed to share'));
-                                    }
-                                }, 1000);
-                            });
-
-                            setShareSuccess('Project shared successfully!');
-                            setShareEmails([]);
-                            setPermissions({});
-                        } catch (error) {
-                            setShareError(error instanceof Error ? error.message : String(error));
-                        } finally {
-                            setShareLoading(false);
-                        }
+            {/* New Project Modal */}
+            <NewProjectModal
+                open={showNewProjectModal}
+                onClose={() => setShowNewProjectModal(false)}
+                onCreate={handleCreateProject}
+            />
+            {/* Select Project Modal */}
+            {showSelectProjectModal && isPro && (
+                <SelectProjectModal
+                    history={history}
+                    onSelect={id => {
+                        setTranslationId(id);
+                        setShowSelectProjectModal(false);
+                        setShowShareModal(true);
                     }}
-                    newEmail={newShareEmail}
-                    setNewEmail={setNewShareEmail}
+                    onClose={() => setShowSelectProjectModal(false)}
+                />
+            )}
+            {/* Share Project Modal */}
+            {showShareModal && isPro && translationId && (
+                <ShareProjectModal
+                    projectId={translationId}
+                    link={`https://translayte.com/projects/${translationId}`}
+                    onClose={() => setShowShareModal(false)}
+                    fetchPermissions={() => Promise.resolve([])}
+                    updatePermission={async () => {}}
+                    removeUser={async () => {}}
+                    addUser={async () => {}}
+                    generalAccess={{ enabled: false, role: 'viewer' }}
+                    setGeneralAccess={async () => {}}
                 />
             )}
         </>

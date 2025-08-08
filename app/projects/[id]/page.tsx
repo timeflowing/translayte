@@ -5,8 +5,9 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '@/app/lib/firebaseClient';
 import SynapseAnimation from '@/app/utils/SynapseAnimation';
 import NavigationBar from '@/app/components/NavigationBar';
+import { useParams } from 'next/navigation';
 
-// Fallback Modal if you don't have one
+// Fallback Modal (can be replaced with your actual Modal component)
 const Modal = ({ children, onClose }: { children: React.ReactNode; onClose: () => void }) => (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
         <div className="bg-[#232136] rounded-xl shadow-lg p-6 min-w-[320px] relative">
@@ -37,18 +38,9 @@ interface Project {
     permissions?: { [uid: string]: 'view' | 'edit' };
 }
 
-const ProjectPage = ({ params }: { params: { id: string } }) => {
-    interface FirebaseUser {
-        uid: string;
-        email?: string;
-        displayName?: string;
-        accessToken?: string;
-        stsTokenManager?: {
-            accessToken: string;
-        };
-        [key: string]: unknown;
-    }
-    const [user] = useAuthState(auth) as [FirebaseUser | null, boolean, Error | undefined];
+const ProjectPage = () => {
+    // Use the official User type from firebase/auth
+    const [user, loadingAuth] = useAuthState(auth);
     const [project, setProject] = useState<Project | null>(null);
     const [orgMembers, setOrgMembers] = useState<OrgMember[]>([]);
     const [showShareModal, setShowShareModal] = useState(false);
@@ -57,50 +49,74 @@ const ProjectPage = ({ params }: { params: { id: string } }) => {
     const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const params = useParams();
+    const projectId = params.id as string;
 
     // Fetch project details
     useEffect(() => {
-        if (!user) return;
-        setLoading(true);
-        setError(null);
-        const accessToken =
-            (user as FirebaseUser).accessToken ||
-            (user as FirebaseUser).stsTokenManager?.accessToken;
-        fetch(`/api/projects/${params.id}`, {
-            headers: { authorization: `Bearer ${accessToken}` },
-        })
-            .then(res => res.json())
-            .then(data => {
-                if (!data.project) throw new Error(data.error || 'Project not found');
-                setProject(data.project);
-                // Fetch org members
-                fetch(`/api/organizations/${data.project.orgId}/members`, {
-                    headers: { authorization: `Bearer ${accessToken}` },
-                })
-                    .then(res => res.json())
-                    .then(data => setOrgMembers(data.members || []))
-                    .catch(() => setOrgMembers([]));
+        if (loadingAuth || !user || !projectId) {
+            if (!loadingAuth && !user) {
+                setError('You must be logged in to view this project.');
                 setLoading(false);
-            })
-            .catch(() => {
-                setError('Failed to load project.');
+            }
+            return;
+        }
+
+        const fetchProject = async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                // FIX: This is the correct and reliable way to get the token
+                const token = await user.getIdToken();
+                const response = await fetch(`/api/projects/${projectId}`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.error || 'Failed to fetch project');
+                }
+
+                const data = await response.json();
+                setProject(data);
+
+                if (data.orgId) {
+                    fetch(`/api/organizations/${data.orgId}/members`, {
+                        headers: { authorization: `Bearer ${token}` },
+                    })
+                        .then(res => res.json())
+                        .then(data => setOrgMembers(data.members || []))
+                        .catch(() => setOrgMembers([]));
+                }
+            } catch (err) {
+                setError(err instanceof Error ? err.message : 'An unknown error occurred');
+            } finally {
                 setLoading(false);
-            });
-    }, [user, params.id]);
+            }
+        };
+
+        fetchProject();
+    }, [user, projectId, loadingAuth]);
 
     // Share handler
     const handleShare = async () => {
         if (!user) return;
-        const accessToken =
-            (user as FirebaseUser).accessToken ||
-            (user as FirebaseUser).stsTokenManager?.accessToken;
-        await fetch(`/api/projects/${params.id}/share`, {
-            method: 'POST',
-            headers: { authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sharedWith: selectedUsers, permissions }),
-        });
-        setShowShareModal(false);
-        // Optionally refetch project
+        try {
+            // FIX: Use getIdToken() here as well for consistency and reliability
+            const token = await user.getIdToken();
+            await fetch(`/api/projects/${projectId}/share`, {
+                method: 'POST',
+                headers: { authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sharedWith: selectedUsers, permissions }),
+            });
+            setShowShareModal(false);
+            // Optionally refetch project data to show changes
+        } catch (err) {
+            console.error('Failed to share project:', err);
+            // You could show a toast notification here for the error
+        }
     };
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -124,11 +140,9 @@ const ProjectPage = ({ params }: { params: { id: string } }) => {
                                 Translation status:{' '}
                                 <span className="font-bold text-[#A78BFA]">{project?.status}</span>
                             </p>
-                            {/* Translation content */}
                             <div className="bg-[#232136]/60 rounded-lg p-4 mb-6 text-white">
                                 {project?.translation?.text || 'No translation yet.'}
                             </div>
-                            {/* Share Button */}
                             <button
                                 className="py-2 px-6 rounded-lg bg-[#A78BFA] hover:bg-[#7C5AE6] text-white font-semibold transition flex items-center gap-2 mb-6"
                                 onClick={() => setShowShareModal(true)}
@@ -149,7 +163,6 @@ const ProjectPage = ({ params }: { params: { id: string } }) => {
                                 </svg>
                                 Share Project
                             </button>
-                            {/* Shared Users List */}
                             <div className="mb-4">
                                 <h2 className="text-lg font-semibold text-white mb-2">
                                     Shared With
@@ -173,7 +186,6 @@ const ProjectPage = ({ params }: { params: { id: string } }) => {
                     )}
                 </div>
             </div>
-            {/* Share Modal */}
             {showShareModal && (
                 <Modal onClose={() => setShowShareModal(false)}>
                     <div className="p-6">

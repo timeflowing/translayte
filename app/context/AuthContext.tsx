@@ -57,9 +57,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             ...userData,
                             uid: authUser.uid,
                         } as User);
-                        console.log('Loaded user from Firestore:', {
-                            ...userData,
-                        });
                     } else {
                         const [firstName, ...rest] = (authUser.displayName || '').split(' ');
                         const lastName = rest.join(' ');
