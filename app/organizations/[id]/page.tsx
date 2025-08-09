@@ -5,15 +5,36 @@ import { auth } from '@/app/lib/firebaseClient';
 import NavigationBar from '@/app/components/NavigationBar';
 import SynapseAnimation from '@/app/utils/SynapseAnimation';
 
+interface OrganizationMember {
+    id: string;
+    name: string;
+    email?: string;
+    // Add other member fields as needed
+}
+
+interface Organization {
+    id: string;
+    name: string;
+    members?: Array<OrganizationMember>;
+    // Add other fields as needed
+}
+
+interface Project {
+    id: string;
+    name?: string;
+    status?: string;
+    // Add other fields as needed
+}
+
 const OrganizationDetailPage = ({ params }: { params: { id: string } }) => {
     const [user] = useAuthState(auth);
-    const [org, setOrg] = useState<any>(null);
-    const [projects, setProjects] = useState<any[]>([]);
+    const [org, setOrg] = useState<Organization | null>(null);
+    const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         if (!user) return;
-        const accessToken = (user as any).accessToken || (user as any).stsTokenManager?.accessToken;
+        const accessToken = user.uid;
         fetch(`/api/organizations/${params.id}`, {
             headers: { authorization: `Bearer ${accessToken}` },
         })
