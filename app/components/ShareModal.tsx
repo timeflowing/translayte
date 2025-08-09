@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 
 // --- TYPES ---
 type Role = 'viewer' | 'editor';
@@ -141,12 +142,14 @@ export default function ShareProjectModal({
                                 key={user.email}
                                 className="flex items-center justify-between gap-3 bg-[#191627] rounded-lg px-4 py-2 mb-2"
                             >
-                                {/* Avatar */}
                                 <div className="flex items-center gap-3">
+                                    {/* Avatar */}
                                     {user.avatarUrl ? (
-                                        <img
+                                        <Image
                                             src={user.avatarUrl}
                                             alt={user.name}
+                                            width={32}
+                                            height={32}
                                             className="w-8 h-8 rounded-full object-cover"
                                         />
                                     ) : (
@@ -154,6 +157,7 @@ export default function ShareProjectModal({
                                             {user.name?.[0] || user.email[0]}
                                         </div>
                                     )}
+
                                     <div>
                                         <div className="text-white font-semibold">
                                             {user.name || user.email}

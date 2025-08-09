@@ -5,16 +5,28 @@ import { auth } from '@/app/lib/firebaseClient';
 import NavigationBar from '@/app/components/NavigationBar';
 import SynapseAnimation from '@/app/utils/SynapseAnimation';
 
+interface Member {
+    id: string;
+    name: string;
+    // Add other member properties as needed
+}
+
+interface Organization {
+    id: string;
+    name: string;
+    members?: Member[]; // Specify the type for members
+}
+
 const OrganizationsPage = () => {
     const [user] = useAuthState(auth);
-    const [orgs, setOrgs] = useState<any[]>([]);
+    const [orgs, setOrgs] = useState<Organization[]>([]);
     const [loading, setLoading] = useState(true);
     const [newOrgName, setNewOrgName] = useState('');
     const [creating, setCreating] = useState(false);
 
     useEffect(() => {
         if (!user) return;
-        const accessToken = (user as any).accessToken || (user as any).stsTokenManager?.accessToken;
+        const accessToken = user.getIdToken();
         fetch('/api/organizations', {
             headers: { authorization: `Bearer ${accessToken}` },
         })
@@ -28,7 +40,7 @@ const OrganizationsPage = () => {
     const handleCreateOrg = async () => {
         if (!newOrgName.trim()) return;
         setCreating(true);
-        const accessToken = (user as any).accessToken || (user as any).stsTokenManager?.accessToken;
+        const accessToken = user?.getIdToken();
         await fetch('/api/organizations', {
             method: 'POST',
             headers: { authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
