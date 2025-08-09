@@ -1,50 +1,59 @@
 'use client';
+
 import React, { useEffect, useState } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '@/app/lib/firebaseClient';
 import NavigationBar from '@/app/components/NavigationBar';
 import SynapseAnimation from '@/app/utils/SynapseAnimation';
+import { useParams } from 'next/navigation';
 
 interface OrganizationMember {
     id: string;
     name: string;
     email?: string;
-    // Add other member fields as needed
 }
 
 interface Organization {
     id: string;
     name: string;
-    members?: Array<OrganizationMember>;
-    // Add other fields as needed
+    members?: OrganizationMember[];
 }
 
 interface Project {
     id: string;
     name?: string;
     status?: string;
-    // Add other fields as needed
 }
 
-const OrganizationDetailPage = ({ params }: { params: { id: string } }) => {
+export default function OrganizationDetailPage() {
+    const { id } = useParams<{ id: string }>(); // 👈 grab the route param here
     const [user] = useAuthState(auth);
     const [org, setOrg] = useState<Organization | null>(null);
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!user) return;
-        const accessToken = user.uid;
-        fetch(`/api/organizations/${params.id}`, {
-            headers: { authorization: `Bearer ${accessToken}` },
-        })
-            .then(res => res.json())
-            .then(data => {
+        if (!user || !id) return;
+
+        let ignore = false;
+        (async () => {
+            // Use a real ID token, not uid
+            const accessToken = await user.getIdToken();
+            const res = await fetch(`/api/organizations/${id}`, {
+                headers: { authorization: `Bearer ${accessToken}` },
+            });
+            const data = await res.json();
+            if (!ignore) {
                 setOrg(data.organization);
                 setProjects(data.projects || []);
                 setLoading(false);
-            });
-    }, [user, params.id]);
+            }
+        })();
+
+        return () => {
+            ignore = true;
+        };
+    }, [user, id]);
 
     return (
         <div className="min-h-screen relative overflow-hidden flex flex-col bg-gradient-to-br from-[#232136] to-[#191627]">
@@ -59,7 +68,7 @@ const OrganizationDetailPage = ({ params }: { params: { id: string } }) => {
                             {org?.name}
                         </h1>
                         <div className="mb-8 text-center text-gray-300">
-                            Members: {org?.members?.length || 1}
+                            Members: {org?.members?.length ?? 0}
                         </div>
                         <h2 className="text-xl font-semibold text-white mb-4">Projects</h2>
                         <div className="grid gap-6">
@@ -91,5 +100,4 @@ const OrganizationDetailPage = ({ params }: { params: { id: string } }) => {
             </div>
         </div>
     );
-};
-export default OrganizationDetailPage;
+}
