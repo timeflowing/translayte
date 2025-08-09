@@ -25,7 +25,7 @@ interface ShareModalProps {
 
 // --- COMPONENT ---
 export default function ShareProjectModal({
-    projectId,
+    // projectId,
     link,
     onClose,
     fetchPermissions,

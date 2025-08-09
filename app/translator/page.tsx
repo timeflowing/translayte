@@ -100,6 +100,8 @@ import NewProjectModal from '../components/NewProjectModal';
 import { DropZone } from '../components/DropZone';
 import { parseInput } from '../utils/inputParser';
 import ShareProjectModal from '../components/ShareModal';
+import { usePresence } from '../hooks/usePresence';
+import { CollaboratorsCard } from '../components/CollaboratorsCards';
 
 type HistoryItem = {
     id: string;
@@ -130,8 +132,8 @@ export default function TranslatorPage() {
 
     // UPDATE THIS LINE:
     const isPro = subscriptionStatus === 'active' || subscriptionStatus === 'trialing';
-
     const [translationId, setTranslationId] = useState<string | null>(null);
+    const { collaborators } = usePresence(translationId || undefined);
     const [showSelectProjectModal, setShowSelectProjectModal] = useState(false);
     const [showNewProjectModal, setShowNewProjectModal] = useState(false);
 
@@ -174,6 +176,7 @@ export default function TranslatorPage() {
     const [isUserTranslation, setIsUserTranslation] = useState(false);
     const [keyCount, setKeyCount] = useState(0);
     const [, setCharCount] = useState(0);
+    const [dontSave, setDontSave] = useState(false);
 
     const handleUpdateTitle = async (id: string, newTitle: string) => {
         try {
@@ -336,12 +339,13 @@ export default function TranslatorPage() {
     };
     useEffect(() => {
         if (
+            !dontSave && // <-- Add this line
             isPro &&
             translationResult &&
             user &&
             user.uid &&
             Object.keys(translationResult).length > 0 &&
-            isUserTranslation // <-- Only save if user-generated
+            isUserTranslation
         ) {
             const saveHistory = async () => {
                 try {
@@ -428,27 +432,28 @@ export default function TranslatorPage() {
             await updateDoc(doc(db, 'users', user.uid), {
                 keys_month: keysThisMonth + allKeys.length,
             });
-
-            if (translationId) {
-                // Update current project
-                await updateDoc(doc(db, 'translations', translationId), {
-                    fileName: fileName ?? 'Untitled',
-                    sourceLanguage: 'EN',
-                    targetLanguages: Array.from(selectedShortcuts),
-                    translationResult: finalResult,
-                    updatedAt: serverTimestamp(),
-                });
-            } else {
-                // Create new project
-                const docRef = await addDoc(collection(db, 'translations'), {
-                    userId: user.uid,
-                    fileName: fileName ?? 'Untitled',
-                    sourceLanguage: 'EN',
-                    targetLanguages: Array.from(selectedShortcuts),
-                    translationResult: finalResult,
-                    createdAt: serverTimestamp(),
-                });
-                setTranslationId(docRef.id);
+            if (!dontSave) {
+                if (translationId) {
+                    // Update current project
+                    await updateDoc(doc(db, 'translations', translationId), {
+                        fileName: fileName ?? 'Untitled',
+                        sourceLanguage: 'EN',
+                        targetLanguages: Array.from(selectedShortcuts),
+                        translationResult: finalResult,
+                        updatedAt: serverTimestamp(),
+                    });
+                } else {
+                    // Create new project
+                    const docRef = await addDoc(collection(db, 'translations'), {
+                        userId: user.uid,
+                        fileName: fileName ?? 'Untitled',
+                        sourceLanguage: 'EN',
+                        targetLanguages: Array.from(selectedShortcuts),
+                        translationResult: finalResult,
+                        createdAt: serverTimestamp(),
+                    });
+                    setTranslationId(docRef.id);
+                }
             }
         } catch (e) {
             console.error('[Translayte] Translation error:', e);
@@ -1258,6 +1263,22 @@ export default function TranslatorPage() {
                                     </button>
                                 </div>
                             </div>
+                            <label className="flex items-center cursor-pointer select-none">
+                                <span className="text-sm text-gray-300">Don’t Save</span>
+                                <span className="flex-1" />
+                                <span
+                                    className={`relative inline-block w-10 h-6 transition rounded-full ${
+                                        dontSave ? 'bg-[#8B5CF6]' : 'bg-gray-700'
+                                    }`}
+                                    onClick={() => setDontSave(v => !v)}
+                                >
+                                    <span
+                                        className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                                            dontSave ? 'translate-x-4' : ''
+                                        }`}
+                                    />
+                                </span>
+                            </label>
                         </div>
                         {showPaywall && (
                             <div className="p-4 mt-4 mb-4 bg-yellow-800 text-yellow-100 rounded-lg">
@@ -1275,7 +1296,34 @@ export default function TranslatorPage() {
                                 isRetranslate={!!translationResult}
                             />
                         </div>
-
+                        {isPro && (
+                            <>
+                                <button
+                                    className="w-full mt-4 group relative inline-flex items-center justify-center font-semibold px-4 py-2 rounded-lg border border-gray-800 bg-[#232323]/60 backdrop-blur-sm text-gray-400 hover:bg-[#232323]/80 hover:text-white transition"
+                                    onClick={() => {
+                                        if (translationId) {
+                                            setShowShareModal(true);
+                                        } else {
+                                            setShowSelectProjectModal(true);
+                                        }
+                                    }}
+                                >
+                                    <span className="absolute inset-0 rounded-lg pointer-events-none" />
+                                    <span className="relative z-10 flex items-center gap-2">
+                                        <i className="fa-solid fa-share-nodes text-gray-500 group-hover:text-white transition-colors text-sm" />
+                                        Share Project
+                                    </span>
+                                </button>
+                                <div className="mt-4">
+                                    <CollaboratorsCard
+                                        collaborators={collaborators}
+                                        onInviteClick={() => {
+                                            if (translationId) setShowShareModal(true);
+                                        }}
+                                    />
+                                </div>
+                            </>
+                        )}
                         {/* --- Translation History Section --- */}
                         {isPro && (
                             <div className="bg-[#191919]/70 backdrop-blur-sm rounded-lg p-4 mt-4">
@@ -1291,24 +1339,6 @@ export default function TranslatorPage() {
                                     onUpdateTitle={handleUpdateTitle}
                                 />
                             </div>
-                        )}
-                        {isPro && (
-                            <button
-                                className="w-full mt-4 group relative inline-flex items-center justify-center font-semibold px-4 py-2 rounded-lg border border-gray-800 bg-[#232323]/60 backdrop-blur-sm text-gray-400 hover:bg-[#232323]/80 hover:text-white transition"
-                                onClick={() => {
-                                    if (translationId) {
-                                        setShowShareModal(true);
-                                    } else {
-                                        setShowSelectProjectModal(true);
-                                    }
-                                }}
-                            >
-                                <span className="absolute inset-0 rounded-lg pointer-events-none" />
-                                <span className="relative z-10 flex items-center gap-2">
-                                    <i className="fa-solid fa-share-nodes text-gray-500 group-hover:text-white transition-colors text-sm" />
-                                    Share Project
-                                </span>
-                            </button>
                         )}
                     </aside>
                 </div>

@@ -9,7 +9,7 @@ export async function updatePermission(projectId: string, email: string, role: R
     const snap = await getDoc(docRef);
     const data = snap.data();
     if (!data) return;
-    const updated = (data.permissions ?? []).map((p: any) =>
+    const updated = (data.permissions ?? []).map((p: { email: string; role: Role }) =>
         p.email === email ? { ...p, role } : p
     );
     await updateDoc(docRef, { permissions: updated });

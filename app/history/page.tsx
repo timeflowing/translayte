@@ -7,17 +7,18 @@ import Modal from '@/app/components/Modal';
 
 const HistoryPage = () => {
     const [user] = useAuthState(auth);
-    const [history, setHistory] = useState<any[]>([]); // Load your history as needed
+    const [history, setHistory] = useState([]); // Load your history as needed
     const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
-    const [selectedTranslation, setSelectedTranslation] = useState<any>(null);
+    const [selectedTranslation, setSelectedTranslation] = useState<unknown>(null);
     const [projectName, setProjectName] = useState('');
     const [selectedOrgId, setSelectedOrgId] = useState('');
-    const [orgs, setOrgs] = useState<any[]>([]);
+    type Org = { id: string; name: string };
+    const [orgs, setOrgs] = useState<Org[]>([]);
 
     // Fetch organizations for picker
     React.useEffect(() => {
         if (!user) return;
-        const accessToken = (user as any).accessToken || (user as any).stsTokenManager?.accessToken;
+        const accessToken = user.uid;
         fetch('/api/organizations', {
             headers: { authorization: `Bearer ${accessToken}` },
         })
@@ -28,7 +29,7 @@ const HistoryPage = () => {
     // Fetch history
     React.useEffect(() => {
         if (!user) return;
-        const accessToken = (user as any).accessToken || (user as any).stsTokenManager?.accessToken;
+        const accessToken = user.uid;
         fetch('/api/history', {
             headers: { authorization: `Bearer ${accessToken}` },
         })
@@ -39,7 +40,7 @@ const HistoryPage = () => {
     // Save as project handler
     const handleCreateProject = async () => {
         if (!user || !selectedTranslation || !projectName || !selectedOrgId) return;
-        const accessToken = (user as any).accessToken || (user as any).stsTokenManager?.accessToken;
+        const accessToken = user.uid;
         await fetch('/api/projects', {
             method: 'POST',
             headers: { authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
@@ -85,7 +86,7 @@ const HistoryPage = () => {
                                 />
                             </svg>
                             {/* Translation text */}
-                            <div className="flex-1">{translation.text}</div>
+                            <div className="flex-1">TODO</div>
                             <button
                                 className="py-2 px-4 rounded-lg bg-[#A78BFA] hover:bg-[#7C5AE6] text-white font-semibold transition mt-2"
                                 onClick={() => {
@@ -118,7 +119,6 @@ const HistoryPage = () => {
                             onChange={e => setSelectedOrgId(e.target.value)}
                             className="mb-4 px-4 py-2 rounded-lg bg-[#232136] text-white border border-[#8B5CF6]/30 w-full"
                         >
-                            <option value="">Select Organization</option>
                             {orgs.map(org => (
                                 <option key={org.id} value={org.id}>
                                     {org.name}
