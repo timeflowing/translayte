@@ -3,9 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 
 
 // GET handler to fetch a single project
-// FIX: Pass the whole context and destructure inside the function
-export async function GET(req: NextRequest, context: { params: { projectId: string } }) {
-    const { projectId } = context.params; // Destructure here
+export async function GET(req: NextRequest, { params }: { params: Promise<{ projectId: string }> }) {
+    const { projectId } = await params;
     try {
         const authHeader = req.headers.get('authorization');
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -40,9 +39,8 @@ export async function GET(req: NextRequest, context: { params: { projectId: stri
 }
 
 // DELETE handler to remove a project
-// FIX: Pass the whole context and destructure inside the function
-export async function DELETE(req: NextRequest, context: { params: { projectId: string } }) {
-    const { projectId } = context.params; // Destructure here
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ projectId: string }> }) {
+    const { projectId } = await params;
     try {
         const authHeader = req.headers.get('authorization');
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -79,8 +77,8 @@ export async function DELETE(req: NextRequest, context: { params: { projectId: s
 }
 
 // POST handler to update sharing permissions
-export async function POST(req: NextRequest, context: { params: { projectId: string } }) {
-    const { projectId } = context.params;
+export async function POST(req: NextRequest, { params }: { params: Promise<{ projectId: string }> }) {
+    const { projectId } = await params;
     try {
         const authHeader = req.headers.get('authorization');
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
