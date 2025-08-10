@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminAuth, adminDB } from '@/app/lib/firebaseAdmin';
+import { adminAuth, adminDB } from '../../../lib/firebaseAdmin';
 
 // --- Simple in-memory rate limiter (for demonstration) ---
 const requestCounts: { [key: string]: { count: number; last: number } } = {};
@@ -149,4 +149,88 @@ export async function DELETE(req: NextRequest, { params }: { params: { projectId
         response = NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
     return response;
+}
+
+// --- POST Accept Invitation ---
+export async function POST(req: NextRequest) {
+    try {
+        // Authentication
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+        }
+        
+        const idToken = authHeader.split('Bearer ')[1];
+        const decodedToken = await adminAuth.verifyIdToken(idToken);
+        const userId = decodedToken.uid;
+        const userEmail = decodedToken.email;
+
+        const { token } = await req.json();
+
+        if (!token) {
+            return NextResponse.json({ error: 'Invitation token is required' }, { status: 400 });
+        }
+
+        // Find invitation
+        const invitationsSnapshot = await adminDB.collection('invitations')
+            .where('token', '==', token)
+            .where('status', '==', 'pending')
+            .limit(1)
+            .get();
+
+        if (invitationsSnapshot.empty) {
+            return NextResponse.json({ error: 'Invalid or expired invitation' }, { status: 404 });
+        }
+
+        const invitationDoc = invitationsSnapshot.docs[0];
+        const invitation = invitationDoc.data();
+
+        // Check if invitation is expired
+        if (invitation.expiresAt.toDate() < new Date()) {
+            await invitationDoc.ref.update({ status: 'expired' });
+            return NextResponse.json({ error: 'Invitation has expired' }, { status: 400 });
+        }
+
+        // Check if email matches
+        if (invitation.email !== userEmail) {
+            return NextResponse.json({ error: 'This invitation is for a different email address' }, { status: 403 });
+        }
+
+        // Update project permissions
+        if (invitation.projectId) {
+            const projectRef = adminDB.collection('translations').doc(invitation.projectId);
+            const projectDoc = await projectRef.get();
+
+            if (projectDoc.exists) {
+                const projectData = projectDoc.data();
+                const sharedWith = projectData?.sharedWith || {};
+                const permissions = projectData?.permissions || {};
+
+                sharedWith[userId] = { role: invitation.role };
+                permissions[userId] = invitation.role;
+
+                await projectRef.update({
+                    sharedWith,
+                    permissions
+                });
+            }
+        }
+
+        // Mark invitation as accepted
+        await invitationDoc.ref.update({ 
+            status: 'accepted',
+            acceptedAt: new Date(),
+            acceptedBy: userId
+        });
+
+        return NextResponse.json({ 
+            success: true, 
+            message: 'Invitation accepted successfully',
+            projectId: invitation.projectId
+        });
+
+    } catch (error) {
+        console.error('Accept invitation error:', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
 }

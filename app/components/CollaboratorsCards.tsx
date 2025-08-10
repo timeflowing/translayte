@@ -70,10 +70,10 @@ export function CollaboratorsCard({
 
             <button
                 onClick={onInviteClick}
-                className="mt-4 text-sm text-[#8B5CF6] hover:underline inline-flex items-center gap-2"
+                className="mt-4 w-full py-2 px-4 rounded-lg bg-[#8B5CF6] hover:bg-[#7C3AED] text-white font-semibold transition flex items-center justify-center gap-2"
             >
-                <i className="fa-regular fa-user-plus" />
-                Invite team member
+                <i className="fa-solid fa-share-nodes" />
+                Share Project
             </button>
         </div>
     );

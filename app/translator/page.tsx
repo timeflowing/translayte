@@ -79,6 +79,7 @@ import {
     collection,
     serverTimestamp,
     setDoc,
+    getDoc,
     deleteDoc,
     updateDoc,
     query,
@@ -99,7 +100,7 @@ import ModeSwitcher from '../components/ModeSwitcher';
 import NewProjectModal from '../components/NewProjectModal';
 import { DropZone } from '../components/DropZone';
 import { parseInput } from '../utils/inputParser';
-import ShareProjectModal from '../components/ShareModal';
+import SimpleLinkShareModal from '../components/SimpleLinkShareModal';
 import { usePresence } from '../hooks/usePresence';
 import { CollaboratorsCard } from '../components/CollaboratorsCards';
 
@@ -115,7 +116,7 @@ type HistoryItem = {
 const FREE_TIER_KEY_LIMIT = 69;
 
 export default function TranslatorPage() {
-    const { user, loading: authLoading } = useAuth();
+    const { user, authUser, loading: authLoading } = useAuth();
     const router = useRouter(); // <-- Add this line
     const [keysThisMonth, setKeysThisMonth] = useState(0);
     const [showPaywall, setShowPaywall] = useState(false);
@@ -136,6 +137,9 @@ export default function TranslatorPage() {
     const { collaborators } = usePresence(translationId || undefined);
     const [showSelectProjectModal, setShowSelectProjectModal] = useState(false);
     const [showNewProjectModal, setShowNewProjectModal] = useState(false);
+
+    // Sharing state
+    const [isPubliclyShared, setIsPubliclyShared] = useState(false);
 
     const [selectedShortcuts, setSelectedShortcuts] = useState<Set<string>>(new Set(['IT', 'CS']));
     const [rows, setRows] = useState<{ key: string; value: string; context: string }[]>([
@@ -596,39 +600,82 @@ export default function TranslatorPage() {
             setSubscriptionStatus(sub.status);
         });
 
-        // Listener for translations history
+        // Listener for translations history - include both owned and shared
         setHistoryLoading(true);
 
-        const translationsUnsub = onSnapshot(
+        // Combine results from both queries
+        let ownedHistory: (HistoryItem & { isOwner: boolean })[] = [];
+        let sharedHistory: (HistoryItem & { isOwner: boolean })[] = [];
+
+        const updateHistory = (
+            items: (HistoryItem & { isOwner: boolean })[],
+            type: 'owned' | 'shared',
+        ) => {
+            if (type === 'owned') {
+                ownedHistory = items;
+            } else {
+                sharedHistory = items;
+            }
+
+            const allItems = [...ownedHistory, ...sharedHistory].sort(
+                (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
+            );
+
+            setHistory(allItems);
+            setHistoryLoading(false);
+        };
+
+        // Query for translations owned by the user
+        const ownedTranslationsUnsub = onSnapshot(
             query(collection(db, 'translations'), where('userId', '==', user.uid)),
             snap => {
-                const items = snap.docs
-                    .map(doc => {
-                        // Define a type for the Firestore document data
-                        type TranslationDoc = HistoryItem & { title?: string };
-                        const raw = doc.data() as TranslationDoc;
-                        // Support both 'title' and 'fileName' for backward compatibility
-                        let name = undefined;
-                        if (typeof raw.title === 'string' && raw.title.length > 0) {
-                            name = raw.title;
-                        } else if (typeof raw.fileName === 'string' && raw.fileName.length > 0) {
-                            name = raw.fileName;
-                        }
-                        // Spread all fields so userId and createdAt are present
-                        return {
-                            ...raw,
-                            id: doc.id,
-                            fileName: name,
-                        } as HistoryItem;
-                    })
-                    .filter(item => item.userId === user.uid)
-                    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-                setHistory(items);
+                const ownedItems = snap.docs.map(doc => {
+                    const raw = doc.data() as HistoryItem & { title?: string };
+                    let name = undefined;
+                    if (typeof raw.title === 'string' && raw.title.length > 0) {
+                        name = raw.title;
+                    } else if (typeof raw.fileName === 'string' && raw.fileName.length > 0) {
+                        name = raw.fileName;
+                    }
+                    return {
+                        ...raw,
+                        id: doc.id,
+                        fileName: name,
+                        isOwner: true,
+                    } as HistoryItem & { isOwner: boolean };
+                });
+                updateHistory(ownedItems, 'owned');
+            },
+            error => {
+                console.error('Error loading owned translations:', error);
                 setHistoryLoading(false);
             },
-            () => {
+        );
+
+        // Query for translations shared with the user
+        const sharedTranslationsUnsub = onSnapshot(
+            query(collection(db, 'translations'), where(`sharedWith.${user.uid}`, '!=', null)),
+            snap => {
+                const sharedItems = snap.docs.map(doc => {
+                    const raw = doc.data() as HistoryItem & { title?: string };
+                    let name = undefined;
+                    if (typeof raw.title === 'string' && raw.title.length > 0) {
+                        name = raw.title;
+                    } else if (typeof raw.fileName === 'string' && raw.fileName.length > 0) {
+                        name = raw.fileName;
+                    }
+                    return {
+                        ...raw,
+                        id: doc.id,
+                        fileName: name,
+                        isOwner: false,
+                    } as HistoryItem & { isOwner: boolean };
+                });
+                updateHistory(sharedItems, 'shared');
+            },
+            error => {
+                console.error('Error loading shared translations:', error);
                 setHistoryLoading(false);
-                toast.error('Failed to load translation history.');
             },
         );
 
@@ -636,9 +683,38 @@ export default function TranslatorPage() {
         return () => {
             userUnsub();
             subscriptionsUnsub();
-            translationsUnsub();
+            ownedTranslationsUnsub();
+            sharedTranslationsUnsub();
         };
     }, [user]);
+
+    // Fetch sharing status when translation ID changes
+    useEffect(() => {
+        if (!translationId || !user) {
+            setIsPubliclyShared(false);
+            return;
+        }
+
+        const fetchSharingStatus = async () => {
+            try {
+                // Check if translation has sharing info in Firestore
+                const translationRef = doc(db, 'translations', translationId);
+                const translationDoc = await getDoc(translationRef);
+
+                if (translationDoc.exists()) {
+                    const data = translationDoc.data();
+                    setIsPubliclyShared(data?.isPubliclyShared || false);
+                } else {
+                    setIsPubliclyShared(false);
+                }
+            } catch (error) {
+                console.error('Failed to check sharing status:', error);
+                setIsPubliclyShared(false);
+            }
+        };
+
+        fetchSharingStatus();
+    }, [translationId, user]);
 
     useEffect(() => {
         if (mode === 'file') {
@@ -1315,12 +1391,14 @@ export default function TranslatorPage() {
                                     </span>
                                 </button>
                                 <div className="mt-4">
-                                    <CollaboratorsCard
-                                        collaborators={collaborators}
-                                        onInviteClick={() => {
-                                            if (translationId) setShowShareModal(true);
-                                        }}
-                                    />
+                                    {translationId && (
+                                        <CollaboratorsCard
+                                            collaborators={collaborators}
+                                            onInviteClick={() => {
+                                                if (translationId) setShowShareModal(true);
+                                            }}
+                                        />
+                                    )}
                                 </div>
                             </>
                         )}
@@ -1364,16 +1442,43 @@ export default function TranslatorPage() {
             )}
             {/* Share Project Modal */}
             {showShareModal && isPro && translationId && (
-                <ShareProjectModal
-                    projectId={translationId}
-                    link={`https://translayte.com/projects/${translationId}`}
+                <SimpleLinkShareModal
+                    link={`${window.location.origin}/share/${translationId}`}
                     onClose={() => setShowShareModal(false)}
-                    fetchPermissions={() => Promise.resolve([])}
-                    updatePermission={async () => {}}
-                    removeUser={async () => {}}
-                    addUser={async () => {}}
-                    generalAccess={{ enabled: false, role: 'viewer' }}
-                    setGeneralAccess={async () => {}}
+                    isPubliclyShared={isPubliclyShared}
+                    onTogglePublicSharing={async () => {
+                        if (!user || !authUser) return;
+                        try {
+                            const token = await authUser.getIdToken();
+                            const newSharingState = !isPubliclyShared;
+
+                            const response = await fetch(`/api/share/${translationId}`, {
+                                method: 'POST',
+                                headers: {
+                                    Authorization: `Bearer ${token}`,
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    isPubliclyShared: newSharingState,
+                                }),
+                            });
+
+                            if (!response.ok) {
+                                throw new Error(`Failed to update sharing: ${response.statusText}`);
+                            }
+
+                            const result = await response.json();
+                            setIsPubliclyShared(result.isPubliclyShared);
+                            toast.success(
+                                result.isPubliclyShared
+                                    ? 'Project is now publicly shareable!'
+                                    : 'Project sharing disabled',
+                            );
+                        } catch (error) {
+                            console.error('Failed to update sharing:', error);
+                            toast.error('Failed to update sharing settings');
+                        }
+                    }}
                 />
             )}
         </>

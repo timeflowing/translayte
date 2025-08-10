@@ -1,36 +1,58 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth, db } from '../../lib/firebaseClient';
-import { doc, getDoc, DocumentData } from 'firebase/firestore';
+import { auth } from '../../lib/firebaseClient';
 
 export default function SharePage() {
     const params = useParams();
     const token = params.token as string;
+    const router = useRouter();
 
-    // Fix: Rename one of the loading variables to avoid conflict
     const [pageLoading, setPageLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [user, authLoading] = useAuthState(auth); // Renamed from 'loading' to 'authLoading'
-    const [sharedData, setSharedData] = useState<DocumentData | null>(null);
-    const router = useRouter();
+    const [user, authLoading] = useAuthState(auth);
+    const [sharedData, setSharedData] = useState<{
+        id: string;
+        fileName: string;
+        sourceLanguage: string;
+        targetLanguages: string[];
+        translationResult: Record<string, Record<string, string>>;
+        createdAt?: { seconds: number };
+        isOwner: boolean;
+    } | null>(null);
 
     useEffect(() => {
         const fetchSharedData = async () => {
-            if (authLoading) return; // Wait for auth to load
+            if (authLoading) return;
 
             try {
-                const shareDoc = await getDoc(doc(db, 'shares', token));
+                const headers: HeadersInit = {
+                    'Content-Type': 'application/json',
+                };
 
-                if (!shareDoc.exists()) {
-                    setError('Shared translation not found');
+                // Add auth header if user is logged in
+                if (user) {
+                    const idToken = await (
+                        user as { getIdToken: () => Promise<string> }
+                    ).getIdToken();
+                    headers['Authorization'] = `Bearer ${idToken}`;
+                }
+
+                const response = await fetch(`/api/share/${token}`, {
+                    method: 'GET',
+                    headers,
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    setError(errorData.error || 'Failed to load shared translation');
                     setPageLoading(false);
                     return;
                 }
 
-                const data = shareDoc.data();
+                const data = await response.json();
                 setSharedData(data);
             } catch (err) {
                 console.error('Error fetching shared data:', err);
@@ -41,9 +63,8 @@ export default function SharePage() {
         };
 
         fetchSharedData();
-    }, [token, authLoading]);
+    }, [token, authLoading, user]);
 
-    // Show loading while either page or auth is loading
     if (pageLoading || authLoading) {
         return (
             <div className="min-h-screen bg-[#0F0F23] flex items-center justify-center">
@@ -99,7 +120,11 @@ export default function SharePage() {
                 {/* Header */}
                 <div className="text-center mb-8">
                     <h1 className="text-4xl font-bold text-white mb-2">Shared Translation</h1>
-                    <p className="text-gray-300">Shared by {sharedData.createdBy || 'Anonymous'}</p>
+                    <h2 className="text-2xl text-[#8B5CF6] mb-2">{sharedData.fileName}</h2>
+                    <p className="text-gray-300">
+                        Languages: {sharedData.sourceLanguage} →{' '}
+                        {sharedData.targetLanguages?.join(', ')}
+                    </p>
                     {sharedData.createdAt && (
                         <p className="text-gray-400 text-sm">
                             Created on{' '}
@@ -112,9 +137,10 @@ export default function SharePage() {
                 <div className="bg-[#18181b] rounded-xl p-6">
                     <h2 className="text-xl font-semibold text-white mb-4">Translation Results</h2>
 
-                    {sharedData.translations && Object.keys(sharedData.translations).length > 0 ? (
+                    {sharedData.translationResult &&
+                    Object.keys(sharedData.translationResult).length > 0 ? (
                         <div className="space-y-6">
-                            {Object.entries(sharedData.translations).map(
+                            {Object.entries(sharedData.translationResult).map(
                                 ([langCode, translations]) => (
                                     <div
                                         key={langCode}
@@ -140,25 +166,23 @@ export default function SharePage() {
                 {/* Actions */}
                 <div className="flex justify-center gap-4 mt-8">
                     <button
-                        onClick={() => router.push('/')}
+                        onClick={() => router.push('/translator')}
                         className="bg-[#8B5CF6] text-white px-6 py-2 rounded-lg hover:bg-[#7C3AED] transition-colors"
                     >
                         Create Your Own Translation
                     </button>
 
-                    {user && (
-                        <button
-                            onClick={() => {
-                                navigator.clipboard.writeText(
-                                    JSON.stringify(sharedData.translations, null, 2),
-                                );
-                                alert('Translation copied to clipboard!');
-                            }}
-                            className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors"
-                        >
-                            Copy Translation
-                        </button>
-                    )}
+                    <button
+                        onClick={() => {
+                            navigator.clipboard.writeText(
+                                JSON.stringify(sharedData.translationResult, null, 2),
+                            );
+                            alert('Translation copied to clipboard!');
+                        }}
+                        className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+                    >
+                        Copy Translation
+                    </button>
                 </div>
             </div>
         </div>
