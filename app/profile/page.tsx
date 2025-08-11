@@ -50,6 +50,7 @@ interface UserProfile {
     slackConnected?: boolean;
     subscription?: { status: string | null };
     keys_month?: number;
+    chars_month?: number;
 }
 // -- Helper for days left, mock logic, update as needed --
 function getTrialDaysLeft(trialEndsAt: string | null) {

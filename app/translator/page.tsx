@@ -180,7 +180,7 @@ export default function TranslatorPage() {
     const [historyLoading, setHistoryLoading] = useState(false);
     const [isUserTranslation, setIsUserTranslation] = useState(false);
     const [keyCount, setKeyCount] = useState(0);
-    const [, setCharCount] = useState(0);
+    const [charCount, setCharCount] = useState(0);
     const [dontSave, setDontSave] = useState(false);
 
     const handleUpdateTitle = async (id: string, newTitle: string) => {
@@ -1241,13 +1241,27 @@ export default function TranslatorPage() {
                                     </>
                                 )}
                                 {mode === 'keys' ? (
-                                    <KeyValueContextInput
-                                        rows={rows}
-                                        onChange={newRows => {
-                                            setRows(newRows);
-                                        }}
-                                        disableDeleteFirstRow
-                                    />
+                                    <>
+                                        <KeyValueContextInput
+                                            rows={rows}
+                                            onChange={newRows => {
+                                                setRows(newRows);
+                                            }}
+                                            disableDeleteFirstRow
+                                        />
+                                        <div className="mt-2 flex items-center justify-end text-xs">
+                                            <div className="flex items-center gap-4 text-gray-400">
+                                                <span className="flex items-center gap-1">
+                                                    <i className="fa-solid fa-key text-yellow-400"></i>
+                                                    {keyCount} keys
+                                                </span>
+                                                <span className="flex items-center gap-1">
+                                                    <i className="fa-solid fa-font text-blue-400"></i>
+                                                    {charCount} chars
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </>
                                 ) : null}
                             </div>
 
