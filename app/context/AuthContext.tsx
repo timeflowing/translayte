@@ -27,6 +27,7 @@ export interface User {
     slackConnected?: boolean;
     subscription?: { status: string | null };
     keys_month?: number;
+    chars_month?: number;
 }
 
 interface AuthContext {
@@ -72,6 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                 Date.now() + 7 * 24 * 60 * 60 * 1000,
                             ).toISOString(),
                             keys_month: 0,
+                            chars_month: 0,
                             subscription: { status: null },
                         };
                         setDoc(userRef, profile)

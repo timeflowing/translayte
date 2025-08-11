@@ -82,9 +82,17 @@ export async function POST(req: NextRequest) {
 
         if (!isPro) {
             const keysThisMonth = userData?.keys_month || 0;
+            const charsThisMonth = userData?.chars_month || 0;
             const keyCount = Object.keys(payload).length;
+            
+            // Calculate character count from all values in the payload
+            const charCount = Object.values(payload).reduce((total: number, value: unknown) => {
+                return total + (typeof value === 'string' ? value.length : String(value).length);
+            }, 0);
+            
             await userRef.update({
                 keys_month: keysThisMonth + keyCount,
+                chars_month: charsThisMonth + charCount,
             });
         }
 

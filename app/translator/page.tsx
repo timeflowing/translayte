@@ -119,6 +119,7 @@ export default function TranslatorPage() {
     const { user, authUser, loading: authLoading } = useAuth();
     const router = useRouter(); // <-- Add this line
     const [keysThisMonth, setKeysThisMonth] = useState(0);
+    const [charsThisMonth, setCharsThisMonth] = useState(0);
     const [showPaywall, setShowPaywall] = useState(false);
 
     // ADD THIS STATE:
@@ -433,8 +434,15 @@ export default function TranslatorPage() {
             setSelectedPreviewLang(targetCodes[0] ?? null);
             setIsUserTranslation(true);
 
+            // Calculate character count from input text
+            const allValues = Object.values(payload);
+            const charCount = allValues.reduce((total: number, value: unknown) => {
+                return total + (typeof value === 'string' ? value.length : String(value).length);
+            }, 0);
+
             await updateDoc(doc(db, 'users', user.uid), {
                 keys_month: keysThisMonth + allKeys.length,
+                chars_month: charsThisMonth + charCount,
             });
             if (!dontSave) {
                 if (translationId) {
@@ -574,14 +582,16 @@ export default function TranslatorPage() {
             // Clear data if user logs out
             setSubscriptionStatus(null);
             setKeysThisMonth(0);
+            setCharsThisMonth(0);
             setHistory([]);
             return;
         }
 
-        // Listener for user-specific data (keys_month)
+        // Listener for user-specific data (keys_month and chars_month)
         const userUnsub = onSnapshot(doc(db, 'users', user.uid), snap => {
             const userData = snap.data();
             setKeysThisMonth(userData?.keys_month || 0);
+            setCharsThisMonth(userData?.chars_month || 0);
         });
 
         // FIX: Listen to the correct collection for subscription status
@@ -778,11 +788,13 @@ export default function TranslatorPage() {
                         Translayte
                     </Link>
                     {user && (
-                        <div className="text-sm text-gray-300 flex items-center gap-2">
-                            <i className="fa-solid fa-key text-yellow-400" />
-                            {isPro
-                                ? 'Pro Plan — Unlimited'
-                                : `Free — ${keysThisMonth} / ${FREE_TIER_KEY_LIMIT} keys`}
+                        <div className="text-sm text-gray-300 flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                                <i className="fa-solid fa-key text-yellow-400" />
+                                {isPro
+                                    ? 'Pro Plan — Unlimited'
+                                    : `${keysThisMonth} / ${FREE_TIER_KEY_LIMIT} keys`}
+                            </div>
                         </div>
                     )}
                     {/* Auth nav */}

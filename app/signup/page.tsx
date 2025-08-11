@@ -50,28 +50,30 @@ const RegisterPage = () => {
     };
 
     return (
-        <div className="flex flex-col md:flex-row min-h-screen">
+        <div className="flex flex-col lg:flex-row min-h-screen">
             {/* Left Side - Branding */}
-            <div className="w-full md:w-1/2 min-h-[400px] md:min-h-screen flex flex-col justify-center items-center relative overflow-hidden px-8 md:px-12 bg-transparent">
+            <div className="w-full lg:w-1/2 min-h-[50vh] lg:min-h-screen flex flex-col justify-center items-center relative overflow-hidden px-4 sm:px-8 lg:px-12 py-8 lg:py-0 bg-transparent">
                 <SynapseAnimation className="absolute inset-0 w-full h-full -z-10" />
-                <div className="flex flex-col gap-8 z-10">
+                <div className="flex flex-col gap-4 lg:gap-8 z-10 text-center lg:text-left">
                     {/* Logo */}
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br from-[#A383F7] to-[#8257E6] shadow-lg">
-                            <div className="w-5 h-5 bg-black rounded-[6px]" />
+                    <div className="flex items-center gap-3 mb-2 justify-center lg:justify-start">
+                        <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-xl flex items-center justify-center bg-gradient-to-br from-[#A383F7] to-[#8257E6] shadow-lg">
+                            <div className="w-4 h-4 lg:w-5 lg:h-5 bg-black rounded-[6px]" />
                         </div>
                         <span className="text-lg font-bold text-white tracking-wide">
                             Translayte
                         </span>
                     </div>
                     {/* Title */}
-                    <h1 className="text-4xl font-bold text-white mb-2">Create Your Account</h1>
-                    <p className="text-gray-300 mb-8 max-w-lg">
+                    <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">
+                        Create Your Account
+                    </h1>
+                    <p className="text-gray-300 mb-4 lg:mb-8 max-w-lg text-sm sm:text-base">
                         Start transforming your content with intelligent translation, powered by
                         advanced AI.
                     </p>
                     {/* Features */}
-                    <div className="grid grid-cols-2 gap-6 bg-[#191627] p-6 rounded-2xl shadow-lg w-full max-w-md">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6 bg-[#191627] p-4 lg:p-6 rounded-2xl shadow-lg w-full max-w-sm sm:max-w-md">
                         <Feature
                             title="AI Translation"
                             desc="Context-aware translations in 13+ languages"
@@ -96,10 +98,12 @@ const RegisterPage = () => {
                 </div>
             </div>
             {/* Right Side - Register Form */}
-            <div className="w-1/2 min-h-screen flex items-center justify-center px-6 bg-[#16131f]">
-                <div className="w-full max-w-md bg-[#191627] p-8 rounded-2xl shadow-xl">
-                    <h2 className="text-2xl font-bold text-white mb-6">Sign Up</h2>
-                    <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="w-full lg:w-1/2 min-h-[50vh] lg:min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-6 py-8 lg:py-0 bg-[#16131f]">
+                <div className="w-full max-w-md bg-[#191627] p-6 sm:p-8 rounded-2xl shadow-xl">
+                    <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6">
+                        Sign Up
+                    </h2>
+                    <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
                         <div>
                             <label
                                 htmlFor="displayName"
@@ -113,7 +117,7 @@ const RegisterPage = () => {
                                 autoComplete="name"
                                 value={displayName}
                                 onChange={e => setDisplayName(e.target.value)}
-                                className="w-full px-4 py-3 rounded-lg bg-[#16131f] border border-[#282443] text-white placeholder-gray-400 focus:ring-2 focus:ring-[#A383F7] outline-none transition"
+                                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg bg-[#16131f] border border-[#282443] text-white placeholder-gray-400 focus:ring-2 focus:ring-[#A383F7] outline-none transition text-sm sm:text-base"
                                 placeholder="Your name"
                             />
                         </div>
@@ -131,7 +135,7 @@ const RegisterPage = () => {
                                 required
                                 value={email}
                                 onChange={e => setEmail(e.target.value)}
-                                className="w-full px-4 py-3 rounded-lg bg-[#16131f] border border-[#282443] text-white placeholder-gray-400 focus:ring-2 focus:ring-[#A383F7] outline-none transition"
+                                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg bg-[#16131f] border border-[#282443] text-white placeholder-gray-400 focus:ring-2 focus:ring-[#A383F7] outline-none transition text-sm sm:text-base"
                                 placeholder="your@email.com"
                             />
                         </div>
@@ -149,7 +153,7 @@ const RegisterPage = () => {
                                 required
                                 value={password}
                                 onChange={e => setPassword(e.target.value)}
-                                className="w-full px-4 py-3 rounded-lg bg-[#16131f] border border-[#282443] text-white placeholder-gray-400 focus:ring-2 focus:ring-[#A383F7] outline-none transition"
+                                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg bg-[#16131f] border border-[#282443] text-white placeholder-gray-400 focus:ring-2 focus:ring-[#A383F7] outline-none transition text-sm sm:text-base"
                                 placeholder="Password"
                             />
                         </div>
@@ -167,21 +171,21 @@ const RegisterPage = () => {
                                 required
                                 value={password2}
                                 onChange={e => setPassword2(e.target.value)}
-                                className="w-full px-4 py-3 rounded-lg bg-[#16131f] border border-[#282443] text-white placeholder-gray-400 focus:ring-2 focus:ring-[#A383F7] outline-none transition"
+                                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg bg-[#16131f] border border-[#282443] text-white placeholder-gray-400 focus:ring-2 focus:ring-[#A383F7] outline-none transition text-sm sm:text-base"
                                 placeholder="Repeat password"
                             />
                         </div>
                         {error && <p className="text-red-500 text-sm">{error}</p>}
                         <button
                             type="submit"
-                            className="w-full py-3 rounded-lg bg-[#A383F7] text-white font-semibold shadow-md hover:bg-[#8257E6] transition"
+                            className="w-full py-2.5 sm:py-3 rounded-lg bg-[#A383F7] text-white font-semibold shadow-md hover:bg-[#8257E6] transition text-sm sm:text-base"
                             disabled={creating}
                         >
                             {creating ? 'Creating...' : 'Sign Up'}
                         </button>
                     </form>
                     {/* Divider */}
-                    <div className="my-6 flex items-center">
+                    <div className="my-4 sm:my-6 flex items-center">
                         <hr className="flex-grow border-[#282443]" />
                         <span className="mx-3 text-sm text-gray-500">or continue with</span>
                         <hr className="flex-grow border-[#282443]" />
@@ -190,7 +194,7 @@ const RegisterPage = () => {
                     <div className="flex flex-col gap-3">
                         <GoogleLoginButton />
                     </div>
-                    <p className="mt-6 text-center text-gray-400 text-sm">
+                    <p className="mt-4 sm:mt-6 text-center text-gray-400 text-sm">
                         Already have an account?{' '}
                         <Link href="/login" className="text-[#A383F7] hover:underline">
                             Log In
@@ -204,13 +208,13 @@ const RegisterPage = () => {
 
 function Feature({ title, desc, icon }: { title: string; desc: string; icon: string }) {
     return (
-        <div className="flex items-start gap-3">
-            <div className="text-xl w-8 h-8 flex items-center justify-center rounded-lg bg-[#252141]">
+        <div className="flex items-start gap-2 sm:gap-3">
+            <div className="text-lg sm:text-xl w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg bg-[#252141] flex-shrink-0">
                 {icon}
             </div>
-            <div>
-                <div className="text-white font-semibold text-base">{title}</div>
-                <div className="text-xs text-gray-400">{desc}</div>
+            <div className="min-w-0">
+                <div className="text-white font-semibold text-sm sm:text-base">{title}</div>
+                <div className="text-xs text-gray-400 leading-tight">{desc}</div>
             </div>
         </div>
     );

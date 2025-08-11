@@ -28,6 +28,7 @@ const BLANK_PROFILE: UserProfile = {
     slackConnected: false,
     subscription: { status: null },
     keys_month: 0,
+    chars_month: 0,
 };
 interface UserProfile {
     firstName: string;
