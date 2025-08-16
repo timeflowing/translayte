@@ -164,6 +164,13 @@ const LoginPage: React.FC = () => {
                     <div className="flex flex-col gap-3">
                         <GoogleLoginButton />
                     </div>
+                    <p className="mt-4 text-xs text-center text-gray-400">
+                        By signing in, you agree to our{' '}
+                        <Link href="/terms" className="underline hover:text-white">
+                            Terms of Service
+                        </Link>
+                        .
+                    </p>
                     <p className="mt-4 sm:mt-6 text-center text-gray-400 text-sm">
                         Don&apos;t have an account?{' '}
                         <Link href="/signup" className="text-[#A383F7] hover:underline">

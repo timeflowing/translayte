@@ -13,6 +13,7 @@ const RegisterPage = () => {
     const [displayName, setDisplayName] = useState('');
     const [password, setPassword] = useState('');
     const [password2, setPassword2] = useState('');
+    const [agreed, setAgreed] = useState(false);
     const [error, setError] = useState('');
     const [creating, setCreating] = useState(false);
     const router = useRouter();
@@ -20,32 +21,27 @@ const RegisterPage = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+        if (!agreed) {
+            setError('You must agree to the Terms and Conditions.');
+            return;
+        }
         if (password !== password2) {
             setError('Passwords do not match.');
             return;
         }
         if (password.length < 6) {
-            setError('Password must be at least 6 characters.');
+            setError('Password must be at least 6 characters long.');
             return;
         }
+        setCreating(true);
         try {
-            setCreating(true);
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            if (displayName.trim()) {
-                await updateProfile(userCredential.user, { displayName });
-            }
-            router.push('/translator'); // or wherever your dashboard/landing is
+            const user = userCredential.user;
+            await updateProfile(user, { displayName });
+            router.push('/'); // Redirect to home or desired page
         } catch (err) {
-            if (err && typeof err === 'object' && 'code' in err) {
-                const error = err as { code: string };
-                setError(
-                    error.code === 'auth/email-already-in-use'
-                        ? 'Email already in use.'
-                        : 'Failed to create account. Please check your details.',
-                );
-            } else {
-                setError('Failed to create account. Please check your details.');
-            }
+            setError('Failed to create an account. Please try again.');
+            setCreating(false);
         }
     };
 
@@ -175,11 +171,42 @@ const RegisterPage = () => {
                                 placeholder="Repeat password"
                             />
                         </div>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-start">
+                                <div className="flex items-center h-5">
+                                    <input
+                                        id="terms"
+                                        aria-describedby="terms"
+                                        type="checkbox"
+                                        className="w-4 h-4 border border-gray-300 rounded bg-gray-50 focus:ring-3 focus:ring-primary-300 dark:bg-gray-700 dark:border-gray-600 dark:focus:ring-primary-600 dark:ring-offset-gray-800"
+                                        required
+                                        checked={agreed}
+                                        onChange={e => setAgreed(e.target.checked)}
+                                    />
+                                </div>
+                                <div className="ml-3 text-sm">
+                                    <label
+                                        htmlFor="terms"
+                                        className="font-light text-gray-500 dark:text-gray-300"
+                                    >
+                                        I accept the{' '}
+                                        <a
+                                            className="font-medium text-primary-600 hover:underline dark:text-primary-500"
+                                            href="/terms"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        >
+                                            Terms and Conditions
+                                        </a>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
                         {error && <p className="text-red-500 text-sm">{error}</p>}
                         <button
                             type="submit"
-                            className="w-full py-2.5 sm:py-3 rounded-lg bg-[#A383F7] text-white font-semibold shadow-md hover:bg-[#8257E6] transition text-sm sm:text-base"
-                            disabled={creating}
+                            className="w-full py-2.5 sm:py-3 rounded-lg bg-[#A383F7] text-white font-semibold shadow-md hover:bg-[#8257E6] transition text-sm sm:text-base disabled:opacity-50"
+                            disabled={creating || !agreed}
                         >
                             {creating ? 'Creating...' : 'Sign Up'}
                         </button>
