@@ -1,8 +1,11 @@
 import type { NextConfig } from "next";
 
+const isProd = process.env.NODE_ENV === 'production';
+
 const nextConfig: NextConfig = {
-  reactStrictMode: true, // Enable React's Strict Mode
-  output: "standalone", // Required for deployment to Netlify
+  reactStrictMode: !isProd,
+  productionBrowserSourceMaps: false,
+  output: "standalone", 
   images: {
     domains: ["source.unsplash.com"],
   },

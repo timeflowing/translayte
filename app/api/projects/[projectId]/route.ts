@@ -1,18 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDB } from '../../../lib/firebaseAdmin';
-
-// --- Simple in-memory rate limiter (for demonstration) ---
-const requestCounts: { [key: string]: { count: number; last: number } } = {};
-function rateLimit(ip: string, limit = 20, windowMs = 60000) {
-    const now = Date.now();
-    if (!requestCounts[ip] || now - requestCounts[ip].last > windowMs) {
-        requestCounts[ip] = { count: 1, last: now };
-        return false;
-    }
-    requestCounts[ip].count++;
-    requestCounts[ip].last = now;
-    return requestCounts[ip].count > limit;
-}
+import { rateLimit } from '../../../utils/rateLimiter';
 
 // --- Helper: Validate and sanitize input ---
 function sanitizeUpdate(body: Record<string, unknown>): Record<string, unknown> | null {

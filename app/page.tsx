@@ -86,6 +86,7 @@ const translations = {
 import { useRouter } from 'next/navigation';
 import { auth } from './lib/firebaseClient';
 import { onAuthStateChanged, setPersistence, browserLocalPersistence } from 'firebase/auth';
+import { LegalFooterLinks } from './components/LegalFooterLinks';
 
 const LandingPage = () => {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -601,7 +602,7 @@ const LandingPage = () => {
                             © {new Date().getFullYear()} Translayte – All rights reserved
                         </p>
                     </div>
-                    <div className="flex flex-wrap justify-center gap-6">
+                    {/* <div className="flex flex-wrap justify-center gap-6">
                         <span className="text-gray-300 hover:text-white transition-colors flex items-center cursor-pointer">
                             <i className="fa-brands fa-github mr-2" /> GitHub
                         </span>
@@ -611,7 +612,8 @@ const LandingPage = () => {
                         <span className="text-gray-300 hover:text-white transition-colors cursor-pointer">
                             Contact: support@translaye.it
                         </span>
-                    </div>
+                    </div> */}
+                    <LegalFooterLinks />
                 </div>
             </footer>
         </>

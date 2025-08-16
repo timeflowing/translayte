@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
-// FIX: Import admin SDK to handle auth and database operations
 import { adminAuth, adminDB } from '../../lib/firebaseAdmin';
+import { rateLimit } from '../../utils/rateLimiter';
 
 // Initialize OpenAI client once
 const client = new OpenAI({
@@ -9,7 +9,11 @@ const client = new OpenAI({
 });
 
 export async function POST(req: NextRequest) {
-    // --- 1. Authentication (Re-enabled for Production Security) ---
+    const ip = req.headers.get('x-forwarded-for') || 'local';
+    if (rateLimit(ip, 10, 60000)) { // More restrictive limit for this endpoint
+        return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
+    }
+
     const authHeader = req.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return NextResponse.json({ error: 'Authentication required' }, { status: 401 });

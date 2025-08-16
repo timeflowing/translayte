@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDB } from '../../../lib/firebaseAdmin';
+import { rateLimit } from '../../../utils/rateLimiter';
 
-// GET /api/share/[id] - Get shared translation data
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const ip = request.headers.get('x-forwarded-for') || 'local';
+  if (rateLimit(ip)) {
+      return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
+  }
   try {
     const { id } = await params;
     
@@ -21,11 +25,13 @@ export async function GET(
     // Check if translation is publicly shareable or if user has access
     const authHeader = request.headers.get('authorization');
     let hasAccess = false;
+    let userId: string | null = null;
     
     if (authHeader) {
       try {
         const idToken = authHeader.replace('Bearer ', '');
         const decoded = await adminAuth.verifyIdToken(idToken);
+        userId = decoded.uid;
         
         // Check if user is owner or has shared access
         hasAccess = translationData?.userId === decoded.uid || 
@@ -40,6 +46,29 @@ export async function GET(
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
     
+    // If user is authenticated and accessing a publicly shared translation,
+    // automatically add them as a collaborator (if not already owner)
+    if (userId && translationData?.isPubliclyShared && translationData?.userId !== userId) {
+      const currentSharedWith = translationData?.sharedWith || {};
+      
+      // Only add if not already a collaborator
+      if (!currentSharedWith[userId]) {
+        try {
+          await adminDB.collection('translations').doc(id).update({
+            [`sharedWith.${userId}`]: { 
+              role: 'viewer',
+              addedAt: new Date().toISOString(),
+              addedVia: 'public_link'
+            },
+            [`permissions.${userId}`]: 'viewer'
+          });
+        } catch (error) {
+          console.error('Error adding collaborator:', error);
+          // Continue even if this fails
+        }
+      }
+    }
+    
     // Return shareable data (remove sensitive information)
     const shareableData = {
       id: translationDoc.id,
@@ -48,7 +77,7 @@ export async function GET(
       targetLanguages: translationData?.targetLanguages || [],
       translationResult: translationData?.translationResult || {},
       createdAt: translationData?.createdAt,
-      isOwner: hasAccess && translationData?.userId === (authHeader ? 'user_id' : null)
+      isOwner: hasAccess && translationData?.userId === userId
     };
     
     return NextResponse.json(shareableData);
@@ -64,6 +93,10 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const ip = request.headers.get('x-forwarded-for') || 'local';
+  if (rateLimit(ip)) {
+      return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
+  }
   try {
     const { id } = await params;
     const authHeader = request.headers.get('authorization');
