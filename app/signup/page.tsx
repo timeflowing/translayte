@@ -39,7 +39,7 @@ const RegisterPage = () => {
             const user = userCredential.user;
             await updateProfile(user, { displayName });
             router.push('/'); // Redirect to home or desired page
-        } catch (err) {
+        } catch {
             setError('Failed to create an account. Please try again.');
             setCreating(false);
         }
