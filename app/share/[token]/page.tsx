@@ -435,7 +435,7 @@ export default function ShareBoardPage() {
             setLoading(true);
             load().finally(() => setLoading(false));
         }
-    }, [authLoading, token]); // pageSize is removed from dependencies
+    }, [authLoading, token, load]); // pageSize is removed from dependencies
 
     if (loading || authLoading) {
         return (
