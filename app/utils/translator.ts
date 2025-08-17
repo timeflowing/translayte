@@ -1,10 +1,15 @@
 import { auth } from '../lib/firebaseClient';
 
+export interface TranslationResponse {
+  translations: Record<string, Record<string, string>>;
+  detectedSourceLanguage: string | null;
+}
+
 export async function translateBatch(
   payload: Record<string, string>,
   targetLanguages: string[],
-  sourceLanguage: string = 'en_XX'
-): Promise<Record<string, Record<string, string>>> {
+  sourceLanguage: string = 'auto'
+): Promise<TranslationResponse> {
   try {
     const user = auth.currentUser;
     if (!user) {

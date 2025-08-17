@@ -114,4 +114,5 @@ export const LANGUAGE_OPTIONS = [
     // --- Constructed & Other ---
     { code: 'eo_XX', name: 'Esperanto', shortcut: 'EO', emoji: '🌍' },
     { code: 'la_VA', name: 'Latin', shortcut: 'LA', emoji: '🇻🇦' },
+    { code: 'auto', name: 'Auto Detect', shortcut: 'AUTO', emoji: '🔍' },
 ];

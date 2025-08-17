@@ -64,7 +64,7 @@ function SelectProjectModal({
         </div>
     );
 }
-import React, { useState, ChangeEvent, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation'; // <-- Add this import
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import '../translayte.css';
@@ -89,7 +89,7 @@ import 'react-toastify/dist/ReactToastify.css';
 
 import Link from 'next/link';
 import KeyValueContextInput from '../components/KeyValueContextInput';
-import { LANGUAGE_OPTIONS } from '../languages';
+import { LANGUAGE_OPTIONS } from '../languages'; // Import language options
 import { DuplicateAnalysis } from '../utils/duplicateDetection';
 import DuplicateWarning from '../components/DuplicateWarning';
 import RealtimeInputSection from '../components/RealtimeInputSection';
@@ -180,8 +180,99 @@ export default function TranslatorPage() {
     const [historyLoading, setHistoryLoading] = useState(false);
     const [isUserTranslation, setIsUserTranslation] = useState(false);
     const [keyCount, setKeyCount] = useState(0);
-    const [charCount, setCharCount] = useState(0);
+    const [, setCharCount] = useState(0);
     const [dontSave, setDontSave] = useState(false);
+    const [isDropZoneMinimized, setIsDropZoneMinimized] = useState(false);
+    const [sourceLanguageCode, setSourceLanguageCode] = useState('auto'); // Default to auto-detect
+    const [detectedLanguageName, setDetectedLanguageName] = useState<string | null>(null);
+
+    // Define the languages for the dropdown
+    const sourceLanguageOptions = [
+        LANGUAGE_OPTIONS.find(l => l.code === 'auto'),
+        LANGUAGE_OPTIONS.find(l => l.code === 'en_XX'),
+        LANGUAGE_OPTIONS.find(l => l.code === 'cs_CZ'),
+        LANGUAGE_OPTIONS.find(l => l.code === 'de_DE'),
+        LANGUAGE_OPTIONS.find(l => l.code === 'es_XX'),
+        LANGUAGE_OPTIONS.find(l => l.code === 'fr_XX'),
+    ].filter(Boolean) as typeof LANGUAGE_OPTIONS;
+
+    const detectLanguage = useCallback(async (text: string) => {
+        try {
+            const response = await fetch('/api/detect-language', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text }),
+            });
+            if (!response.ok) throw new Error('Detection failed');
+            const data = await response.json();
+            if (data.languageName) {
+                setDetectedLanguageName(data.languageName);
+            }
+        } catch (error) {
+            console.error('Language detection error:', error);
+            setDetectedLanguageName(null);
+        }
+    }, []);
+
+    useEffect(() => {
+        // Only run auto-detection if the mode is 'auto' and there is text
+        if (sourceLanguageCode !== 'auto' || !jsonInput.trim()) {
+            if (sourceLanguageCode === 'auto') setDetectedLanguageName(null);
+            return;
+        }
+
+        const handler = setTimeout(() => {
+            detectLanguage(jsonInput);
+        }, 500); // Debounce detection
+
+        return () => clearTimeout(handler);
+    }, [jsonInput, sourceLanguageCode, detectLanguage]);
+
+    const handleSourceLanguageChange = (code: string) => {
+        setSourceLanguageCode(code);
+        if (code !== 'auto') {
+            const langName = sourceLanguageOptions.find(l => l.code === code)?.name;
+            setDetectedLanguageName(langName || null);
+        } else {
+            setDetectedLanguageName(null);
+            if (jsonInput.trim()) {
+                detectLanguage(jsonInput);
+            }
+        }
+    };
+
+    // Real-time language detection as the user types
+    useEffect(() => {
+        const textToDetect = mode === 'file' ? jsonInput : rows.map(r => r.value).join(' ');
+
+        if (!textToDetect.trim()) {
+            setDetectedLanguageName(null);
+            setSourceLanguageCode('auto');
+            return;
+        }
+
+        const handler = setTimeout(async () => {
+            try {
+                const response = await fetch('/api/detect-language', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: textToDetect }),
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    setDetectedLanguageName(data.language || null);
+                    setSourceLanguageCode(data.code || 'auto');
+                }
+            } catch (error) {
+                console.error('Language detection failed:', error);
+            }
+        }, 500); // Debounce for 500ms
+
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [jsonInput, rows, mode]);
 
     const handleUpdateTitle = async (id: string, newTitle: string) => {
         try {
@@ -238,29 +329,6 @@ export default function TranslatorPage() {
             }
             return next;
         });
-    };
-
-    const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        setFileName(file.name);
-        const reader = new FileReader();
-        reader.onload = () => {
-            let text = reader.result as string;
-            // If not wrapped in { }, wrap it
-            const trimmed = text.trim();
-            if (trimmed.length && !trimmed.startsWith('{') && !trimmed.endsWith('}')) {
-                text = `{${trimmed}}`;
-            }
-            const json = safeParseJsonInput(text);
-            if (!json) {
-                alert('Invalid JSON file');
-                return;
-            }
-            setJsonInput(JSON.stringify(json, null, 2));
-            setMode('file');
-        };
-        reader.readAsText(file);
     };
 
     const transformToUnityFormat = (result: Record<string, Record<string, string>> | null) => {
@@ -419,7 +487,7 @@ export default function TranslatorPage() {
         try {
             await new Promise(resolve => setTimeout(resolve, 100));
 
-            const translations = await translateBatch(payload, targetCodes, 'en_XX');
+            const { translations } = await translateBatch(payload, targetCodes, sourceLanguageCode);
 
             const finalResult: Record<string, Record<string, string>> = {};
             for (const langCode in translations) {
@@ -449,7 +517,7 @@ export default function TranslatorPage() {
                     // Update current project
                     await updateDoc(doc(db, 'translations', translationId), {
                         fileName: fileName ?? 'Untitled',
-                        sourceLanguage: 'EN',
+                        sourceLanguage: sourceLanguageCode,
                         targetLanguages: Array.from(selectedShortcuts),
                         translationResult: finalResult,
                         updatedAt: serverTimestamp(),
@@ -459,7 +527,7 @@ export default function TranslatorPage() {
                     const docRef = await addDoc(collection(db, 'translations'), {
                         userId: user.uid,
                         fileName: fileName ?? 'Untitled',
-                        sourceLanguage: 'EN',
+                        sourceLanguage: sourceLanguageCode,
                         targetLanguages: Array.from(selectedShortcuts),
                         translationResult: finalResult,
                         createdAt: serverTimestamp(),
@@ -774,7 +842,10 @@ export default function TranslatorPage() {
             toast.error('Failed to create project.');
         }
     };
-
+    const handleFileRead = (content: string, name: string) => {
+        setJsonInput(content);
+        setFileName(name);
+    };
     return (
         <>
             {/* background layer */}
@@ -870,16 +941,65 @@ export default function TranslatorPage() {
                                                 className="flex flex-col"
                                                 style={{ minHeight: 'calc(100vh - 30rem)' }}
                                             >
-                                                <DropZone
-                                                    onSelect={handleFileUpload}
-                                                    fileName={fileName}
-                                                    translationResult={translationResult}
-                                                />
+                                                {/* The button is now part of the animated container */}
+                                                <div
+                                                    className={`relative transition-all duration-300 ease-in-out overflow-visible ${
+                                                        isDropZoneMinimized
+                                                            ? 'max-h-8' // Height for the button
+                                                            : 'max-h-60'
+                                                    }`}
+                                                >
+                                                    {/* The button is positioned absolutely within this container */}
+                                                    <button
+                                                        onClick={() =>
+                                                            setIsDropZoneMinimized(prev => !prev)
+                                                        }
+                                                        className="absolute top-0 right-0 z-20 flex items-center gap-2 text-xs text-gray-400 hover:text-white transition-colors px-2 py-1 rounded hover:bg-gray-700/50"
+                                                        title={
+                                                            isDropZoneMinimized
+                                                                ? 'Show Dropzone'
+                                                                : 'Hide Dropzone'
+                                                        }
+                                                    >
+                                                        <span>
+                                                            {isDropZoneMinimized ? 'Show' : 'Hide'}
+                                                        </span>
+                                                        <i
+                                                            className={`fa-solid fa-chevron-up transition-transform duration-200 ${
+                                                                isDropZoneMinimized
+                                                                    ? 'rotate-180'
+                                                                    : ''
+                                                            }`}
+                                                        />
+                                                    </button>
+
+                                                    {/* The DropZone itself fades out */}
+                                                    <div
+                                                        className={`transition-opacity duration-200 ${
+                                                            isDropZoneMinimized
+                                                                ? 'opacity-0 pointer-events-none'
+                                                                : 'opacity-100'
+                                                        }`}
+                                                    >
+                                                        <DropZone
+                                                            onFileRead={handleFileRead}
+                                                            fileName={fileName}
+                                                            translationResult={translationResult}
+                                                        />
+                                                    </div>
+                                                </div>
+
                                                 <div className="flex-grow">
                                                     <RealtimeInputSection
                                                         inputText={jsonInput}
                                                         setInputText={setJsonInput}
                                                         onDuplicatesChange={setRealtimeDuplicates}
+                                                        detectedLanguage={detectedLanguageName}
+                                                        onSourceLanguageChange={
+                                                            handleSourceLanguageChange
+                                                        }
+                                                        sourceLanguageCode={sourceLanguageCode}
+                                                        availableLanguages={sourceLanguageOptions}
                                                     />
                                                 </div>
 
@@ -1249,18 +1369,6 @@ export default function TranslatorPage() {
                                             }}
                                             disableDeleteFirstRow
                                         />
-                                        <div className="mt-2 flex items-center justify-end text-xs">
-                                            <div className="flex items-center gap-4 text-gray-400">
-                                                <span className="flex items-center gap-1">
-                                                    <i className="fa-solid fa-key text-yellow-400"></i>
-                                                    {keyCount} keys
-                                                </span>
-                                                <span className="flex items-center gap-1">
-                                                    <i className="fa-solid fa-font text-blue-400"></i>
-                                                    {charCount} chars
-                                                </span>
-                                            </div>
-                                        </div>
                                     </>
                                 ) : null}
                             </div>

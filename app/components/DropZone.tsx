@@ -1,11 +1,12 @@
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
 
 interface DZProps {
-    onSelect: (e: ChangeEvent<HTMLInputElement>) => void;
+    onFileRead: (content: string, fileName: string) => void;
     fileName?: string | null;
     translationResult?: Record<string, Record<string, string>> | null;
 }
-export const DropZone: React.FC<DZProps> = ({ onSelect, fileName, translationResult }) => {
+
+export const DropZone: React.FC<DZProps> = ({ onFileRead, fileName, translationResult }) => {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const [drag, setDrag] = useState(false);
     const dragRef = useRef(false);
@@ -135,6 +136,27 @@ export const DropZone: React.FC<DZProps> = ({ onSelect, fileName, translationRes
         };
     }, []);
 
+    const handleFile = (file: File | null) => {
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = e => {
+            const content = e.target?.result as string;
+            if (!content) return;
+
+            try {
+                // Validate that the file is a valid JSON
+                JSON.parse(content);
+                // If valid, pass the content and name up to the parent
+                onFileRead(content, file.name);
+            } catch (error) {
+                // Silently fail on invalid JSON, no alert
+                console.error('The dropped file is not a valid JSON.', error);
+            }
+        };
+        reader.readAsText(file);
+    };
+
     /* ---------------- render */
     return (
         <label
@@ -157,28 +179,7 @@ export const DropZone: React.FC<DZProps> = ({ onSelect, fileName, translationRes
                 e.preventDefault();
                 setDrag(false);
                 pointer.current = null;
-                const file = e.dataTransfer.files?.[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                        try {
-                            JSON.parse(reader.result as string);
-                            // Create a mock FileList with the required 'item' method
-                            const files: FileList = {
-                                0: file,
-                                length: 1,
-                                item: (index: number) => (index === 0 ? file : null),
-                                [Symbol.iterator]: function* () {
-                                    yield file;
-                                },
-                            } as unknown as FileList;
-                            onSelect({ target: { files } } as ChangeEvent<HTMLInputElement>);
-                        } catch {
-                            alert('Invalid JSON');
-                        }
-                    };
-                    reader.readAsText(file);
-                }
+                handleFile(e.dataTransfer.files?.[0]);
             }}
             htmlFor="file-upload"
             className={`relative flex flex-col items-center justify-center ${
@@ -240,7 +241,7 @@ export const DropZone: React.FC<DZProps> = ({ onSelect, fileName, translationRes
                 id="file-upload"
                 type="file"
                 accept=".json"
-                onChange={onSelect}
+                onChange={e => handleFile(e.target.files?.[0] ?? null)}
                 className="sr-only"
             />
         </label>
