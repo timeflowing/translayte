@@ -204,6 +204,9 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                             setInputText={setJsonInput}
                             onDuplicatesChange={setRealtimeDuplicates}
                             disabled={isTranslating}
+                            onSourceLanguageChange={() => {}}
+                            sourceLanguageCode={lastTargetCodes[0] ?? ''}
+                            availableLanguages={LANGUAGE_OPTIONS}
                         />
                         {isTranslating && (
                             <div className="absolute inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center rounded-lg z-10">
