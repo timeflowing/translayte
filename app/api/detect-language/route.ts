@@ -43,8 +43,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ language: null, code: 'auto' });
         }
 
-        // Use the whitelist option to constrain detection
-        const langCode3 = franc(text, { whitelist });
+        // Use the `only` option to constrain detection
+        const langCode3 = franc(text, { only: whitelist });
 
         if (langCode3 && langCode3 !== 'und') {
             const langInfo = langMap.get(langCode3);
