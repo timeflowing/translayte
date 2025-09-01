@@ -862,9 +862,7 @@ export default function TranslatorPage() {
                         <div className="text-sm text-gray-300 flex items-center gap-4">
                             <div className="flex items-center gap-2">
                                 <i className="fa-solid fa-key text-yellow-400" />
-                                {isPro
-                                    ? 'Pro Plan — Unlimited'
-                                    : `${keysThisMonth} / ${FREE_TIER_KEY_LIMIT} keys`}
+                                {isPro && `${keysThisMonth} / ${FREE_TIER_KEY_LIMIT} keys`}
                             </div>
                         </div>
                     )}
