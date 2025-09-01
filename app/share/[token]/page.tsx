@@ -1,15 +1,17 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import {
     collection,
-    deleteDoc,
     doc,
     onSnapshot,
     serverTimestamp,
-    setDoc,
+    query,
+    where,
+    getDocs,
+    writeBatch,
 } from 'firebase/firestore';
 import { auth, db } from '@/app/lib/firebaseClient';
 
@@ -17,6 +19,11 @@ import { auth, db } from '@/app/lib/firebaseClient';
 // Types
 // ──────────────────────────────────────────────────────────────────────────────
 type Lang = string;
+
+type Project = {
+    id: string;
+    name: string;
+};
 
 type Item = {
     key: string;
@@ -148,52 +155,49 @@ function EditableCell({
     value,
     onCommit,
     placeholder,
-    presenceKey,
-    presenceLang,
-    token,
-    currentName,
     metaAt,
     metaBy,
+    onPresenceChange,
 }: {
     value: string;
     onCommit: (v: string) => void;
     placeholder?: string;
-    presenceKey: string;
-    presenceLang?: string;
-    token: string;
-    currentName: string;
     metaAt?: string;
     metaBy?: string;
+    onPresenceChange: (active: boolean) => void;
 }) {
     const [v, setV] = useState(value);
-    useEffect(() => setV(value), [value]);
+    const saveTimeout = useRef<NodeJS.Timeout | null>(null);
 
-    // presence write only when authenticated (your rules require auth)
-    async function setPresence() {
-        if (!auth.currentUser) return;
-        try {
-            const id = presenceLang ? `${presenceKey}::${presenceLang}` : `${presenceKey}::context`;
-            await setDoc(
-                doc(db, 'presence', token, 'cells', id),
-                {
-                    key: presenceKey,
-                    lang: presenceLang || 'context',
-                    uid: auth.currentUser.uid,
-                    name: currentName,
-                    updatedAt: serverTimestamp(),
-                },
-                { merge: true },
-            );
-        } catch {}
-    }
+    // Update local state if the prop changes from outside
+    useEffect(() => {
+        setV(value);
+    }, [value]);
 
-    async function clearPresence() {
-        if (!auth.currentUser) return;
-        try {
-            const id = presenceLang ? `${presenceKey}::${presenceLang}` : `${presenceKey}::context`;
-            await deleteDoc(doc(db, 'presence', token, 'cells', id));
-        } catch {}
-    }
+    // Debounced save effect: saves 1.5s after the user stops typing.
+    useEffect(() => {
+        // If the local value is the same as the prop, there's nothing to save.
+        if (v === value) {
+            return;
+        }
+
+        // Clear any existing timeout to reset the debounce timer.
+        if (saveTimeout.current) {
+            clearTimeout(saveTimeout.current);
+        }
+
+        // Set a new timeout to commit the change after a delay.
+        saveTimeout.current = setTimeout(() => {
+            onCommit(v);
+        }, 1500); // 1.5-second delay
+
+        // Cleanup function to clear the timeout if the component unmounts or `v` changes.
+        return () => {
+            if (saveTimeout.current) {
+                clearTimeout(saveTimeout.current);
+            }
+        };
+    }, [v, value, onCommit]);
 
     return (
         <div className="rounded-md ring-1 ring-gray-800 bg-[#0B0B1A] focus-within:ring-2 focus-within:ring-[#8B5CF6]">
@@ -201,33 +205,121 @@ function EditableCell({
                 className="w-full resize-none bg-transparent px-3 py-2 text-sm text-gray-100 outline-none placeholder-gray-500"
                 rows={1}
                 value={v}
-                onFocus={setPresence}
-                onBlur={async () => {
+                onFocus={() => onPresenceChange(true)}
+                onBlur={() => {
+                    // On blur, commit immediately to prevent data loss, cancelling any scheduled save.
+                    if (saveTimeout.current) clearTimeout(saveTimeout.current);
                     if (v !== value) onCommit(v);
-                    await clearPresence();
+                    onPresenceChange(false);
                 }}
                 onChange={e => setV(e.target.value)}
-                onKeyDown={async e => {
-                    if ((e.key === 'Enter' && (e.metaKey || e.ctrlKey)) || e.key === 'Tab') {
+                onKeyDown={e => {
+                    // Commit on Cmd/Ctrl+Enter (prevent newline)
+                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                        e.preventDefault();
+                        // Also commit immediately.
+                        if (saveTimeout.current) clearTimeout(saveTimeout.current);
                         if (v !== value) onCommit(v);
-                        await clearPresence();
                     }
+                    // Tab will blur naturally; commit happens on blur
                 }}
                 placeholder={placeholder}
                 readOnly={!auth.currentUser}
             />
-            <div className="flex items-center justify-between px-3 pb-1">
-                <div className="text-[10px] text-gray-500">
-                    {metaBy && (
-                        <>
-                            editing by <span className="text-gray-300">{metaBy}</span>
-                            {metaAt ? ` • ${timeAgo(metaAt)}` : null}
-                        </>
-                    )}
-                </div>
-                {/* char limit indicator is shown outside by Progress; this row mirrors the UI feel */}
+        </div>
+    );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Modal Components
+// ──────────────────────────────────────────────────────────────────────────────
+
+function Modal({
+    isOpen,
+    onClose,
+    children,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    children: React.ReactNode;
+}) {
+    if (!isOpen) return null;
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+            onClick={onClose}
+        >
+            <div
+                className="w-full max-w-md rounded-lg bg-[#12122A] p-6 shadow-xl"
+                onClick={e => e.stopPropagation()}
+            >
+                {children}
             </div>
         </div>
+    );
+}
+
+function AddKeyModal({
+    isOpen,
+    onClose,
+    onAddKey,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    onAddKey: (key: string) => void;
+}) {
+    const [key, setKey] = useState('');
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (key.trim()) {
+            onAddKey(key.trim());
+            setKey(''); // Reset input
+            onClose(); // Close modal on submit
+        }
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose}>
+            <form onSubmit={handleSubmit}>
+                <h3 className="mb-4 text-lg font-semibold text-white">Add New Translation Key</h3>
+                <p className="mb-4 text-sm text-gray-400">
+                    Enter a unique key for the new translation. Use dot notation for grouping (e.g.,
+                    `common.buttons.submit`).
+                </p>
+                <div>
+                    <label htmlFor="new-key-input" className="sr-only">
+                        New Key
+                    </label>
+                    <input
+                        id="new-key-input"
+                        type="text"
+                        value={key}
+                        onChange={e => setKey(e.target.value)}
+                        placeholder="e.g., common.submit"
+                        className="w-full rounded-lg bg-[#0B0B1A] px-3 py-2 text-sm text-gray-100 ring-1 ring-gray-800 focus:ring-2 focus:ring-[#8B5CF6]"
+                        autoFocus
+                    />
+                </div>
+                <div className="mt-6 flex justify-end gap-3">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="rounded-lg border border-gray-700 px-4 py-2 text-sm font-medium text-gray-300 hover:bg-gray-800/60"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        className="rounded-lg bg-[#8B5CF6] px-4 py-2 text-sm font-medium text-white hover:bg-[#7C3AED] disabled:opacity-50"
+                        disabled={!key.trim()}
+                    >
+                        Add Key
+                    </button>
+                </div>
+            </form>
+        </Modal>
     );
 }
 
@@ -238,15 +330,21 @@ export default function ShareBoardPage() {
     const params = useParams();
     const token = params.token as string;
     const router = useRouter();
-    const [, authLoading] = useAuthState(auth);
+    const [user, authLoading] = useAuthState(auth);
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [data, setData] = useState<SharedPayload | null>(null);
-    const [allItems, setAllItems] = useState<Item[]>([]); // New state for all items
+    const [allItems, setAllItems] = useState<Item[]>([]);
     const [q, setQ] = useState('');
     const [status, setStatus] = useState<'all' | NonNullable<Item['status']>>('all');
     const [selected, setSelected] = useState<Item | null>(null);
+    const [projects, setProjects] = useState<Project[]>([]);
+    const activePresenceId = useRef<string | null>(null);
+    const [isAddKeyModalOpen, setIsAddKeyModalOpen] = useState(false);
+    const [isMember, setIsMember] = useState(false); // New state to track membership
+
+    const currentName = user?.displayName || 'You';
 
     const langs = useMemo(
         () => (data ? [data.sourceLanguage, ...data.targetLanguages] : []),
@@ -256,7 +354,12 @@ export default function ShareBoardPage() {
     // Presence (per-cell) via Firestore (read-only stream)
     const [presence, setPresence] = useState<Record<string, { name: string }>>({});
     useEffect(() => {
-        const unsub = onSnapshot(collection(db, 'presence', token, 'cells'), snap => {
+        // Only set up the listener if the user is a confirmed member of the project.
+        if (!user || !isMember) {
+            setPresence({});
+            return;
+        }
+        const unsub = onSnapshot(collection(db, 'projects', token, 'presenceCells'), snap => {
             const m: Record<string, { name: string }> = {};
             snap.forEach(d => {
                 const x = d.data();
@@ -265,7 +368,7 @@ export default function ShareBoardPage() {
             setPresence(m);
         });
         return () => unsub();
-    }, [token]);
+    }, [token, user, isMember]); // Add isMember to dependencies
 
     const uniqueCollaborators = useMemo(
         () =>
@@ -286,6 +389,49 @@ export default function ShareBoardPage() {
                     Object.values(r.values).some(v => v?.toLowerCase().includes(n))),
         );
     }, [allItems, q, status]);
+
+    // Centralized presence management
+    async function updateUserPresence(presenceId: string | null) {
+        if (!auth.currentUser) return;
+        if (activePresenceId.current === presenceId) return;
+
+        const batch = writeBatch(db);
+
+        // Delete old presence doc if it exists
+        if (activePresenceId.current) {
+            const oldDocRef = doc(db, 'projects', token, 'presenceCells', activePresenceId.current);
+            batch.delete(oldDocRef);
+        }
+
+        // Set new presence doc if a new one is provided
+        if (presenceId) {
+            const newDocRef = doc(db, 'projects', token, 'presenceCells', presenceId);
+            const [key, lang] = presenceId.split('::');
+            batch.set(newDocRef, {
+                key,
+                lang: lang || 'context',
+                uid: auth.currentUser.uid,
+                name: auth.currentUser.displayName || 'You',
+                updatedAt: serverTimestamp(),
+            });
+        }
+
+        try {
+            await batch.commit();
+            activePresenceId.current = presenceId;
+        } catch (e) {
+            console.error('Failed to update presence', e);
+        }
+    }
+
+    // Cleanup presence on page unload
+    useEffect(() => {
+        return () => {
+            if (activePresenceId.current) {
+                void updateUserPresence(null);
+            }
+        };
+    }, []);
 
     // Server PATCH queue
     const saveQueue = useRef(Promise.resolve());
@@ -338,6 +484,41 @@ export default function ShareBoardPage() {
         return saveQueue.current;
     }
 
+    const handleAddKey = async (newKey: string) => {
+        if (!user) {
+            alert('Please sign in to add a new key.');
+            return;
+        }
+
+        // Check for duplicates
+        if (allItems.some(item => item.key === newKey)) {
+            alert(`Error: Key "${newKey}" already exists.`);
+            return;
+        }
+
+        // Create the new item for optimistic update
+        const newItem: Item = {
+            key: newKey,
+            values: langs.reduce((acc, lang) => ({ ...acc, [lang]: '' }), {}),
+            status: 'draft',
+            updatedAt: new Date().toISOString(),
+            updatedBy: {
+                uid: user.uid,
+                name: currentName,
+            },
+        };
+
+        // Optimistically add to the top of the list
+        setAllItems(currentItems => [newItem, ...currentItems]);
+
+        // Persist the change to the backend.
+        await commitDelta({
+            key: newKey,
+            lang: data?.sourceLanguage,
+            value: '', // initial empty value
+        });
+    };
+
     // Paging
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
@@ -349,93 +530,128 @@ export default function ShareBoardPage() {
         return filtered.slice(start, end);
     }, [filtered, page, pageSize]);
 
-    // Load + API payload → items transform
-    async function load() {
-        // This function now only loads data once
-        if (allItems.length > 0) return;
-
-        try {
-            const headers: HeadersInit = { 'Content-Type': 'application/json' };
-            if (auth.currentUser) {
-                try {
-                    headers['Authorization'] = `Bearer ${await auth.currentUser.getIdToken()}`;
-                } catch {}
-            }
-            const url = new URL(`/api/share/${token}`, window.location.origin);
-            // We no longer need to send pagination params as the API returns everything
-            // url.searchParams.set('pageSize', String(pageSize));
-            // if (cursorArg) url.searchParams.set('cursor', cursorArg);
-
-            type ApiTranslationResult = Record<string, Record<string, string>>;
-            type ApiResponse = {
-                id: string;
-                fileName: string;
-                sourceLanguage: Lang;
-                targetLanguages: Lang[];
-                translationResult: ApiTranslationResult;
-                pageInfo?: { page: number; pageSize: number; nextCursor?: string | null };
-                isOwner?: boolean;
-            };
-
-            const r = await fetch(url.toString(), { headers });
-            if (!r.ok) {
-                const e = await r.json().catch(() => ({}));
-                throw new Error(e.error || `Failed to load (${r.status})`);
-            }
-            const payloadFromApi: ApiResponse = await r.json();
-
-            // transform nested translationResult → Item[]
-            const itemsOut: Item[] = [];
-            const allKeys = new Set<string>();
-            Object.values(payloadFromApi.translationResult || {}).forEach(langObj =>
-                Object.keys(langObj || {}).forEach(k => allKeys.add(k)),
-            );
-
-            allKeys.forEach(key => {
-                const values: Record<Lang, string> = {};
-                values[payloadFromApi.sourceLanguage] = ''; // source not in payload → blank
-                payloadFromApi.targetLanguages.forEach(t => {
-                    const apiLangKey = Object.keys(payloadFromApi.translationResult || {}).find(k =>
-                        k.toLowerCase().startsWith(t.toLowerCase()),
-                    );
-                    values[t] = apiLangKey
-                        ? payloadFromApi.translationResult[apiLangKey]?.[key] || ''
-                        : '';
-                });
-                itemsOut.push({
-                    key,
-                    values,
-                    status: 'draft',
-                    updatedAt: new Date().toISOString(),
-                    updatedBy: { uid: 'system', name: 'System' },
-                });
-            });
-
-            setData({
-                id: payloadFromApi.id,
-                fileName: payloadFromApi.fileName,
-                sourceLanguage: payloadFromApi.sourceLanguage,
-                targetLanguages: payloadFromApi.targetLanguages,
-                isOwner: !!payloadFromApi.isOwner,
-                items: itemsOut, // This can be removed if not used elsewhere
-                pageInfo: payloadFromApi.pageInfo,
-            });
-            setAllItems(itemsOut); // Set the full list of items
-        } catch (e) {
-            setError(
-                typeof e === 'object' && e !== null && 'message' in e
-                    ? (e as { message?: string }).message || 'Failed to load'
-                    : 'Failed to load',
-            );
-        }
-    }
-
+    // Main data loading and project fetching effect.
+    // This effect now correctly handles re-loading when the user or project token changes.
     useEffect(() => {
+        const loadTranslations = async () => {
+            try {
+                const headers: HeadersInit = { 'Content-Type': 'application/json' };
+                if (user) {
+                    try {
+                        headers['Authorization'] = `Bearer ${await user.getIdToken()}`;
+                    } catch {}
+                }
+                const url = new URL(`/api/share/${token}`, window.location.origin);
+
+                type ApiTranslationResult = Record<string, Record<string, string>>;
+                type ApiResponse = {
+                    id: string;
+                    fileName: string;
+                    sourceLanguage: Lang;
+                    targetLanguages: Lang[];
+                    translationResult: ApiTranslationResult;
+                    pageInfo?: { page: number; pageSize: number; nextCursor?: string | null };
+                    isOwner?: boolean;
+                };
+
+                const r = await fetch(url.toString(), { headers });
+                if (!r.ok) {
+                    const e = await r.json().catch(() => ({}));
+                    throw new Error(e.error || `Failed to load (${r.status})`);
+                }
+                const payloadFromApi: ApiResponse = await r.json();
+
+                // transform nested translationResult → Item[]
+                const itemsOut: Item[] = [];
+                const allKeys = new Set<string>();
+                Object.values(payloadFromApi.translationResult || {}).forEach(langObj =>
+                    Object.keys(langObj || {}).forEach(k => allKeys.add(k)),
+                );
+
+                allKeys.forEach(key => {
+                    const values: Record<Lang, string> = {};
+                    values[payloadFromApi.sourceLanguage] = ''; // source not in payload → blank
+                    payloadFromApi.targetLanguages.forEach(t => {
+                        const apiLangKey = Object.keys(payloadFromApi.translationResult || {}).find(
+                            k => k.toLowerCase().startsWith(t.toLowerCase()),
+                        );
+                        values[t] = apiLangKey
+                            ? payloadFromApi.translationResult[apiLangKey]?.[key] || ''
+                            : '';
+                    });
+                    itemsOut.push({
+                        key,
+                        values,
+                        status: 'draft',
+                    });
+                });
+
+                setData({
+                    id: payloadFromApi.id,
+                    fileName: payloadFromApi.fileName,
+                    sourceLanguage: payloadFromApi.sourceLanguage,
+                    targetLanguages: payloadFromApi.targetLanguages,
+                    isOwner: !!payloadFromApi.isOwner,
+                    items: itemsOut,
+                    pageInfo: payloadFromApi.pageInfo,
+                });
+                setAllItems(itemsOut);
+            } catch (e) {
+                setError(
+                    typeof e === 'object' && e !== null && 'message' in e
+                        ? (e as { message?: string }).message || 'Failed to load'
+                        : 'Failed to load',
+                );
+            }
+        };
+
+        const fetchProjects = async () => {
+            if (!user) {
+                setProjects([]);
+                return;
+            }
+            try {
+                // Query matches members map structure with roles
+                const qy = query(
+                    collection(db, 'projects'),
+                    where(`members.${user.uid}.role`, 'in', ['owner', 'editor', 'viewer']),
+                );
+                const querySnapshot = await getDocs(qy);
+                const userProjects = querySnapshot.docs.map(docSnap => ({
+                    id: docSnap.id,
+                    name: (docSnap.data() as any).fileName || 'Untitled Project',
+                }));
+                setProjects(userProjects);
+                // After fetching projects, explicitly check if the current user is a member of the *current* project.
+                setIsMember(userProjects.some(p => p.id === token));
+            } catch (err) {
+                console.error('Failed to fetch projects:', err);
+                setProjects([]);
+                setIsMember(false); // Ensure membership is false on error
+            }
+        };
+
         if (!authLoading) {
+            // Reset state on token/user change to ensure a clean load
             setLoading(true);
-            load().finally(() => setLoading(false));
+            setError(null);
+            setAllItems([]);
+            setData(null);
+            setPage(1); // Reset to first page
+            setIsMember(false); // Reset membership status
+
+            Promise.all([loadTranslations(), fetchProjects()]).finally(() => {
+                setLoading(false);
+            });
         }
-    }, [authLoading, token, load]); // pageSize is removed from dependencies
+    }, [authLoading, token, user]);
+
+    // For logged-out users (or fetch error), at least show the current project in sidebar
+    useEffect(() => {
+        if (!user && data && projects.length === 0) {
+            setProjects([{ id: token, name: data.fileName }]);
+        }
+    }, [data, user, projects.length, token]);
 
     if (loading || authLoading) {
         return (
@@ -465,8 +681,6 @@ export default function ShareBoardPage() {
         );
     }
 
-    const currentName = auth.currentUser?.displayName || 'You';
-
     return (
         <div className="min-h-screen bg-[#0F0F23] text-gray-100">
             <div className="grid grid-cols-1 lg:grid-cols-[260px,1fr,320px] gap-0">
@@ -477,22 +691,30 @@ export default function ShareBoardPage() {
                             Projects
                         </div>
                         <ul className="space-y-1">
-                            <li className="rounded-lg bg-[#17172e] px-3 py-2 text-sm text-white ring-1 ring-violet-800/30">
-                                Website Localization{' '}
-                                <span className="ml-2 rounded-full bg-emerald-700/70 px-2 py-0.5 text-[10px]">
-                                    Active
-                                </span>
-                            </li>
-                            <li className="rounded-lg px-3 py-2 text-sm text-gray-400 hover:bg-[#14142a]">
-                                Mobile App Strings
-                            </li>
-                            <li className="rounded-lg px-3 py-2 text-sm text-gray-400 hover:bg-[#14142a]">
-                                Marketing Materials
-                            </li>
-                            <li className="rounded-lg px-3 py-2 text-sm text-gray-400 hover:bg-[#14142a]">
-                                Documentation
-                            </li>
+                            {projects
+                                .filter(p => p.id) // Critical fix: Ensure project ID is not empty or null
+                                .map(project => (
+                                    <li
+                                        key={project.id}
+                                        onClick={() => router.push(`/share/${project.id}`)}
+                                        className={cn(
+                                            'truncate rounded-lg px-3 py-2 text-sm cursor-pointer',
+                                            project.id === token
+                                                ? 'bg-[#17172e] text-white ring-1 ring-violet-800/30'
+                                                : 'text-gray-400 hover:bg-[#14142a]',
+                                        )}
+                                        title={project.name}
+                                    >
+                                        {project.name}
+                                    </li>
+                                ))}
                         </ul>
+                        <button
+                            onClick={() => router.push('/new')}
+                            className="mt-4 w-full rounded-lg border border-gray-700 px-3 py-2 text-sm text-gray-300 hover:bg-gray-800/60"
+                        >
+                            + Create New Project
+                        </button>
                     </div>
                     <div>
                         <div className="mb-2 text-xs uppercase tracking-wide text-gray-500">
@@ -518,27 +740,10 @@ export default function ShareBoardPage() {
                     <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <div className="flex items-center gap-3">
                             <h1 className="text-xl font-semibold text-white">
-                                Website Localization
+                                {data.fileName || 'Project'}
                             </h1>
-                            <span className="hidden sm:inline text-xs text-gray-400">
-                                {data.sourceLanguage.toUpperCase()} →{' '}
-                                {data.targetLanguages.map(l => l.toUpperCase()).join(', ')}
-                            </span>
-                            <span className="ml-2 rounded-full bg-emerald-700/70 px-2 py-0.5 text-[10px]">
-                                Active
-                            </span>
                         </div>
                         <div className="flex flex-wrap items-center gap-3">
-                            <span className="hidden md:inline-flex items-center gap-2 text-xs text-emerald-400">
-                                ● {Math.max(1, uniqueCollaborators.length)} collaborators online
-                                <span className="flex -space-x-2">
-                                    {['Alex', 'Maria', currentName].slice(0, 4).map(n => (
-                                        <span key={n} className="inline-block">
-                                            <Avatar name={n} />
-                                        </span>
-                                    ))}
-                                </span>
-                            </span>
                             <div className="relative">
                                 <input
                                     value={q}
@@ -570,7 +775,10 @@ export default function ShareBoardPage() {
                             <button className="rounded-lg border border-gray-700 px-3 py-2 text-sm hover:bg-gray-800/60">
                                 Filters
                             </button>
-                            <button className="rounded-lg bg-[#8B5CF6] px-3 py-2 text-sm hover:bg-[#7C3AED]">
+                            <button
+                                onClick={() => setIsAddKeyModalOpen(true)}
+                                className="rounded-lg bg-[#8B5CF6] px-3 py-2 text-sm hover:bg-[#7C3AED]"
+                            >
                                 + Add Key
                             </button>
                         </div>
@@ -623,16 +831,6 @@ export default function ShareBoardPage() {
                                                         </>
                                                     )}
                                                 </div>
-                                                <div className="mt-1 text-[11px] text-violet-300">
-                                                    <button
-                                                        className="underline underline-offset-2"
-                                                        onClick={() => setSelected(row)}
-                                                    >
-                                                        {row.context
-                                                            ? 'View context'
-                                                            : '+ Add context'}
-                                                    </button>
-                                                </div>
                                             </td>
 
                                             {langs.map(l => (
@@ -640,12 +838,14 @@ export default function ShareBoardPage() {
                                                     <EditableCell
                                                         value={row.values[l] || ''}
                                                         placeholder={`Edit ${l.toUpperCase()}…`}
-                                                        presenceKey={row.key}
-                                                        presenceLang={l}
-                                                        token={token}
-                                                        currentName={currentName}
                                                         metaAt={row.updatedAt}
                                                         metaBy={row.updatedBy?.name}
+                                                        onPresenceChange={active => {
+                                                            const presenceId = `${row.key}::${l}`;
+                                                            updateUserPresence(
+                                                                active ? presenceId : null,
+                                                            );
+                                                        }}
                                                         onCommit={async val => {
                                                             if (!auth.currentUser) {
                                                                 alert(
@@ -681,12 +881,6 @@ export default function ShareBoardPage() {
                                                             });
                                                         }}
                                                     />
-                                                    <div className="mt-1 flex items-center gap-2 text-[10px] text-gray-500">
-                                                        <Progress
-                                                            cur={(row.values[l] || '').length}
-                                                            max={row.charLimit}
-                                                        />
-                                                    </div>
                                                 </td>
                                             ))}
 
@@ -785,12 +979,14 @@ export default function ShareBoardPage() {
                                                 <EditableCell
                                                     value={row.values[l] || ''}
                                                     placeholder={`Edit ${l.toUpperCase()}…`}
-                                                    presenceKey={row.key}
-                                                    presenceLang={l}
-                                                    token={token}
-                                                    currentName={currentName}
                                                     metaAt={row.updatedAt}
                                                     metaBy={row.updatedBy?.name}
+                                                    onPresenceChange={active => {
+                                                        const presenceId = `${row.key}::${l}`;
+                                                        updateUserPresence(
+                                                            active ? presenceId : null,
+                                                        );
+                                                    }}
                                                     onCommit={async val => {
                                                         if (!auth.currentUser) {
                                                             alert(
@@ -846,7 +1042,7 @@ export default function ShareBoardPage() {
                         pageSize={pageSize}
                         setPageSize={n => {
                             setPageSize(n);
-                            setPage(1); // Reset to first page when page size changes
+                            setPage(1);
                         }}
                         hasNextPage={page * pageSize < filtered.length}
                         langs={langs}
@@ -880,9 +1076,10 @@ export default function ShareBoardPage() {
                                 <EditableCell
                                     value={selected.context || ''}
                                     placeholder="Add context…"
-                                    presenceKey={selected.key}
-                                    token={token}
-                                    currentName={currentName}
+                                    onPresenceChange={active => {
+                                        const presenceId = `${selected.key}::context`;
+                                        updateUserPresence(active ? presenceId : null);
+                                    }}
                                     onCommit={async val => {
                                         if (!auth.currentUser) {
                                             alert('Please sign in to save changes.');
@@ -1009,6 +1206,11 @@ export default function ShareBoardPage() {
                     )}
                 </aside>
             </div>
+            <AddKeyModal
+                isOpen={isAddKeyModalOpen}
+                onClose={() => setIsAddKeyModalOpen(false)}
+                onAddKey={handleAddKey}
+            />
         </div>
     );
 }
@@ -1037,6 +1239,8 @@ function Footer({
     langs: string[];
     items: Item[];
 }) {
+    const totalPages = Math.ceil(total / pageSize);
+
     return (
         <div className="mt-5 flex flex-col items-center justify-between gap-4 sm:flex-row text-xs text-gray-400">
             <div>
@@ -1050,7 +1254,24 @@ function Footer({
                 >
                     ‹
                 </button>
-                <button className="rounded-md bg-[#8B5CF6] px-2 py-1 text-white">{page}</button>
+
+                {/* Render page number buttons */}
+                {totalPages > 1 &&
+                    Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNumber => (
+                        <button
+                            key={pageNumber}
+                            onClick={() => setPage(pageNumber)}
+                            className={cn(
+                                'rounded-md px-3 py-1',
+                                pageNumber === page
+                                    ? 'bg-[#8B5CF6] text-white'
+                                    : 'border border-gray-700 hover:bg-gray-800',
+                            )}
+                        >
+                            {pageNumber}
+                        </button>
+                    ))}
+
                 <button
                     disabled={!hasNextPage}
                     onClick={() => setPage(page + 1)}
@@ -1076,8 +1297,22 @@ function Footer({
                         items.forEach(r =>
                             langs.forEach(l => (exportObj[l][r.key] = r.values[l] || '')),
                         );
-                        navigator.clipboard.writeText(JSON.stringify(exportObj, null, 2));
-                        alert('Copied JSON');
+                        const txt = JSON.stringify(exportObj, null, 2);
+
+                        if (navigator?.clipboard?.writeText) {
+                            navigator.clipboard.writeText(txt).then(() => alert('Copied JSON'));
+                        } else {
+                            // Fallback: download as a file
+                            const blob = new Blob([txt], { type: 'application/json' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = 'translations.json';
+                            document.body.appendChild(a);
+                            a.click();
+                            a.remove();
+                            URL.revokeObjectURL(url);
+                        }
                     }}
                     className="rounded-lg bg-gray-700 px-3 py-2 text-gray-100 hover:bg-gray-600"
                 >

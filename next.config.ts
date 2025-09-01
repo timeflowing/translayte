@@ -8,6 +8,15 @@ const nextConfig: NextConfig = {
   output: "standalone", 
   images: {
     domains: ["source.unsplash.com"],
+     remotePatterns: [
+            {
+                protocol: 'https',
+                hostname: 'lh3.googleusercontent.com',
+                port: '',
+                pathname: '/**',
+            },
+        ],
+    
   },
   env: {
     TRANSLATOR_SUBSCRIPTION_KEY: process.env.TRANSLATOR_SUBSCRIPTION_KEY,
