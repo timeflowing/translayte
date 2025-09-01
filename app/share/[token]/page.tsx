@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import {
     collection,
@@ -155,8 +155,6 @@ function EditableCell({
     value,
     onCommit,
     placeholder,
-    metaAt,
-    metaBy,
     onPresenceChange,
 }: {
     value: string;
@@ -619,7 +617,7 @@ export default function ShareBoardPage() {
                 const querySnapshot = await getDocs(qy);
                 const userProjects = querySnapshot.docs.map(docSnap => ({
                     id: docSnap.id,
-                    name: (docSnap.data() as any).fileName || 'Untitled Project',
+                    name: docSnap.data().fileName || 'Untitled Project',
                 }));
                 setProjects(userProjects);
                 // After fetching projects, explicitly check if the current user is a member of the *current* project.
