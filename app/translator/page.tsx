@@ -817,6 +817,9 @@ export default function TranslatorPage() {
         { key: 'table', label: 'Table' },
         { key: 'original', label: 'Original' },
     ];
+    const isTranslateDisabled =
+        (mode === 'file' && (!jsonInput || jsonInput.trim() === '')) ||
+        (mode === 'keys' && rows.filter(r => r.key && r.value).length === 0);
     // Handler for creating a new project
     const handleCreateProject = async (name: string, users: string[]) => {
         if (!user) {
@@ -861,8 +864,12 @@ export default function TranslatorPage() {
                     {user && (
                         <div className="text-sm text-gray-300 flex items-center gap-4">
                             <div className="flex items-center gap-2">
-                                <i className="fa-solid fa-key text-yellow-400" />
-                                {isPro && `${keysThisMonth} / ${FREE_TIER_KEY_LIMIT} keys`}
+                                {!isPro && (
+                                    <>
+                                        <i className="fa-solid fa-key text-purple-400" />
+                                        {`${keysThisMonth} / ${FREE_TIER_KEY_LIMIT} keys`}
+                                    </>
+                                )}
                             </div>
                         </div>
                     )}
@@ -1502,6 +1509,7 @@ export default function TranslatorPage() {
                                 onClick={tryTranslate}
                                 loading={isTranslating}
                                 isRetranslate={!!translationResult}
+                                disabled={isTranslateDisabled}
                             />
                         </div>
                         {isPro && (
@@ -1621,15 +1629,19 @@ const TranslateButton = ({
     onClick,
     loading,
     isRetranslate,
+    disabled,
 }: {
     onClick: () => void;
     loading: boolean;
     isRetranslate?: boolean;
+    disabled: boolean;
 }) => (
     <button
         onClick={onClick}
-        disabled={loading}
-        className="btn-primary w-full group relative inline-flex items-center justify-center"
+        disabled={loading || disabled}
+        className={`btn-primary w-full group relative inline-flex items-center justify-center ${
+            disabled ? 'opacity-20 cursor-not-allowed' : ''
+        }`}
     >
         <span className="absolute inset-0 rounded-lg" />
         <span className="relative z-10">
