@@ -188,14 +188,21 @@ const BillingPage = () => {
                                                     );
 
                                                     if (!response.ok) {
-                                                        throw new Error('Failed to create billing portal session.');
+                                                        throw new Error(
+                                                            'Failed to create billing portal session.',
+                                                        );
                                                     }
 
                                                     const { url } = await response.json();
                                                     window.open(url, '_blank');
                                                 } catch (error) {
-                                                    console.error('Error opening billing portal:', error);
-                                                    alert('Unable to open billing portal. Please try again later.');
+                                                    console.error(
+                                                        'Error opening billing portal:',
+                                                        error,
+                                                    );
+                                                    alert(
+                                                        'Unable to open billing portal. Please try again later.',
+                                                    );
                                                 }
                                             }}
                                         >
@@ -294,3 +301,20 @@ const BillingPage = () => {
                             <div className="mt-6 text-xs text-gray-500 text-center">
                                 By subscribing you agree to our{' '}
                                 <Link href="/privacy" className="underline hover:text-[#A78BFA]">
+                                    Privacy Policy
+                                </Link>{' '}
+                                and{' '}
+                                <Link href="/terms" className="underline hover:text-[#A78BFA]">
+                                    Terms of Service
+                                </Link>
+                                .
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default BillingPage;
