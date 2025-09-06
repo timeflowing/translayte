@@ -175,12 +175,29 @@ const BillingPage = () => {
                                     {billing?.subscription?.status !== 'active' && (
                                         <button
                                             className="py-2 px-6 rounded-lg bg-[#A78BFA] hover:bg-[#7C5AE6] text-white font-semibold transition flex items-center gap-2 mt-4"
-                                            onClick={() =>
-                                                window.open(
-                                                    'https://billing.stripe.com/p/login',
-                                                    '_blank',
-                                                )
-                                            }
+                                            onClick={async () => {
+                                                try {
+                                                    const response = await fetch(
+                                                        '/api/billing/create-portal-session',
+                                                        {
+                                                            method: 'POST',
+                                                            headers: {
+                                                                'Content-Type': 'application/json',
+                                                            },
+                                                        },
+                                                    );
+
+                                                    if (!response.ok) {
+                                                        throw new Error('Failed to create billing portal session.');
+                                                    }
+
+                                                    const { url } = await response.json();
+                                                    window.open(url, '_blank');
+                                                } catch (error) {
+                                                    console.error('Error opening billing portal:', error);
+                                                    alert('Unable to open billing portal. Please try again later.');
+                                                }
+                                            }}
                                         >
                                             <svg
                                                 xmlns="http://www.w3.org/2000/svg"
@@ -277,20 +294,3 @@ const BillingPage = () => {
                             <div className="mt-6 text-xs text-gray-500 text-center">
                                 By subscribing you agree to our{' '}
                                 <Link href="/privacy" className="underline hover:text-[#A78BFA]">
-                                    Privacy Policy
-                                </Link>{' '}
-                                and{' '}
-                                <Link href="/terms" className="underline hover:text-[#A78BFA]">
-                                    Terms of Service
-                                </Link>
-                                .
-                            </div>
-                        </>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-export default BillingPage;

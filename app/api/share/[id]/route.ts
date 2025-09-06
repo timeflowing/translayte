@@ -8,7 +8,20 @@ function safeOrigin(req: NextRequest) {
 }
 type Role = 'viewer' | 'editor';
 
-function getMyRole(translationData: Record<string, any>, uid: string | null): Role | null {
+type TranslationData = {
+  userId?: string;
+  sharedWith?: Record<string, { role: Role }>;
+  isPubliclyShared?: boolean;
+  fileName?: string;
+  sourceLanguage?: string;
+  targetLanguages?: string[];
+  translationResult?: Record<string, Record<string, string>>;
+  statuses?: Record<string, string>;
+  contexts?: Record<string, string>;
+  createdAt?: string | null;
+};
+
+function getMyRole(translationData: TranslationData, uid: string | null): Role | null {
   if (!uid) return null;
   if (translationData?.userId === uid) return 'editor'; // treat owner as editor-capable
   const role = translationData?.sharedWith?.[uid]?.role;
