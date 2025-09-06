@@ -26,7 +26,7 @@ interface Project {
 }
 
 export default function OrganizationDetailPage() {
-    const { id } = useParams<{ id: string }>(); // 👈 grab the route param here
+    const { id } = useParams<{ id: string }>();
     const [user] = useAuthState(auth);
     const [org, setOrg] = useState<Organization | null>(null);
     const [projects, setProjects] = useState<Project[]>([]);

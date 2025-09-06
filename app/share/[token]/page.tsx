@@ -429,7 +429,7 @@ export default function ShareBoardPage() {
                 void updateUserPresence(null);
             }
         };
-    }, []);
+    }, [updateUserPresence]);
 
     // Server PATCH queue
     const saveQueue = useRef(Promise.resolve());
