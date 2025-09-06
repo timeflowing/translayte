@@ -26,7 +26,9 @@ interface Project {
 }
 
 export default function OrganizationDetailPage() {
-    const { id } = useParams<{ id: string }>();
+    const params = useParams<{ id: string }>();
+    const id = params?.id;
+
     const [user] = useAuthState(auth);
     const [org, setOrg] = useState<Organization | null>(null);
     const [projects, setProjects] = useState<Project[]>([]);
@@ -54,6 +56,10 @@ export default function OrganizationDetailPage() {
             ignore = true;
         };
     }, [user, id]);
+
+    if (!id) {
+        return <div>Error: Organization ID not found.</div>;
+    }
 
     return (
         <div className="min-h-screen relative overflow-hidden flex flex-col bg-gradient-to-br from-[#232136] to-[#191627]">
