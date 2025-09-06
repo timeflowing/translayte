@@ -39,7 +39,7 @@ const HistoryPage = () => {
 
     // Save as project handler
     const handleCreateProject = async () => {
-        if (!user || !selectedTranslation || !projectName || !selectedOrgId) return;
+        if (!user || !selectedTranslation || !projectName) return;
         const accessToken = user.uid;
         await fetch('/api/projects', {
             method: 'POST',

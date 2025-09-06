@@ -86,8 +86,6 @@ import {
     where,
 } from 'firebase/firestore';
 import 'react-toastify/dist/ReactToastify.css';
-
-import Link from 'next/link';
 import KeyValueContextInput from '../components/KeyValueContextInput';
 import { LANGUAGE_OPTIONS } from '../languages'; // Import language options
 import { DuplicateAnalysis } from '../utils/duplicateDetection';
@@ -103,6 +101,8 @@ import { parseInput } from '../utils/inputParser';
 import SimpleLinkShareModal from '../components/SimpleLinkShareModal';
 import { usePresence } from '../hooks/usePresence';
 import { CollaboratorsCard } from '../components/CollaboratorsCards';
+import { TranslatorHeader } from '../components/Header';
+import { FREE_TIER_KEY_LIMIT } from '../global/constants';
 
 type HistoryItem = {
     id: string;
@@ -112,8 +112,6 @@ type HistoryItem = {
     translationResult?: Record<string, Record<string, string>>;
     createdAt?: { seconds: number; nanoseconds: number };
 };
-
-const FREE_TIER_KEY_LIMIT = 69;
 
 export default function TranslatorPage() {
     const { user, authUser, loading: authLoading } = useAuth();
@@ -130,7 +128,6 @@ export default function TranslatorPage() {
     // ...inside TranslatorPage component...
     const [showShareModal, setShowShareModal] = useState(false);
     // Profile dropdown state
-    const [profileOpen, setProfileOpen] = useState(false);
 
     // UPDATE THIS LINE:
     const isPro = subscriptionStatus === 'active' || subscriptionStatus === 'trialing';
@@ -441,6 +438,7 @@ export default function TranslatorPage() {
 
     /* ---------------- translate ---------------- */
     const handleTranslate = async () => {
+        if (isTranslating) return; // Prevent duplicate calls
         setIsTranslating(true);
 
         if (mode === 'keys') {
@@ -490,6 +488,11 @@ export default function TranslatorPage() {
             const { translations } = await translateBatch(payload, targetCodes, sourceLanguageCode);
 
             const finalResult: Record<string, Record<string, string>> = {};
+
+            // Save the original text under the sourceLanguage key
+            finalResult[sourceLanguageCode] = payload;
+
+            // Save the translations for each target language
             for (const langCode in translations) {
                 finalResult[langCode] = translations[langCode];
             }
@@ -512,9 +515,10 @@ export default function TranslatorPage() {
                 keys_month: keysThisMonth + allKeys.length,
                 chars_month: charsThisMonth + charCount,
             });
+
             if (!dontSave) {
                 if (translationId) {
-                    // Update current project
+                    // Update the existing translation
                     await updateDoc(doc(db, 'translations', translationId), {
                         fileName: fileName ?? 'Untitled',
                         sourceLanguage: sourceLanguageCode,
@@ -523,7 +527,7 @@ export default function TranslatorPage() {
                         updatedAt: serverTimestamp(),
                     });
                 } else {
-                    // Create new project
+                    // Create a new translation only if `translationId` is not set
                     const docRef = await addDoc(collection(db, 'translations'), {
                         userId: user.uid,
                         fileName: fileName ?? 'Untitled',
@@ -532,7 +536,7 @@ export default function TranslatorPage() {
                         translationResult: finalResult,
                         createdAt: serverTimestamp(),
                     });
-                    setTranslationId(docRef.id);
+                    setTranslationId(docRef.id); // Set the translation ID to avoid duplicate saves
                 }
             }
         } catch (e) {
@@ -827,14 +831,26 @@ export default function TranslatorPage() {
             return;
         }
         try {
+            // Convert array → map keyed by uid (or emails if that’s your model)
+            const sharedMap: Record<string, { role: 'viewer' | 'editor' }> = {};
+            for (const u of users) {
+                // if you pass emails, resolve to uid on server; for now set as email key
+                sharedMap[u] = { role: 'viewer' };
+            }
+
             const docRef = await addDoc(collection(db, 'translations'), {
                 userId: user.uid,
                 fileName: name,
+                sourceLanguage: 'en_XX', // write needed fields from the start
+                targetLanguages: [],
+                translationResult: {},
+                // IMPORTANT: map type for sharedWith to support where(`sharedWith.${uid}`, '!=', null)
+                sharedWith: sharedMap,
                 createdAt: serverTimestamp(),
-                sharedWith: users,
             });
+
             setTranslationId(docRef.id);
-            setIsUserTranslation(true); // ✅ Mark project as active
+            setIsUserTranslation(true);
             setFileName(name);
             setRows([{ key: '', value: '', context: '' }]);
             setJsonInput('');
@@ -855,68 +871,12 @@ export default function TranslatorPage() {
             <div className="fixed inset-0 -z-10" />
 
             {/* header */}
-            <header className="fixed w-full z-50 bg-[#0F0F0F]/80 backdrop-blur-md border-b border-gray-800">
-                <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-                    {/* Logo/Home */}
-                    <Link href="/" className="text-xl font-bold gradient-text">
-                        Translayte
-                    </Link>
-                    {user && (
-                        <div className="text-sm text-gray-300 flex items-center gap-4">
-                            <div className="flex items-center gap-2">
-                                {!isPro && (
-                                    <>
-                                        <i className="fa-solid fa-key text-purple-400" />
-                                        {`${keysThisMonth} / ${FREE_TIER_KEY_LIMIT} keys`}
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                    {/* Auth nav */}
-                    {user ? (
-                        <div className="relative">
-                            <button
-                                onClick={() => setProfileOpen(o => !o)}
-                                className="px-3 py-1 rounded hover:bg-gray-700 flex items-center gap-1"
-                            >
-                                Hello there, {user.email ? user.email.split('@')[0] : 'User'}
-                                <i className="fa-solid fa-chevron-down text-xs" />
-                            </button>
-                            {profileOpen && (
-                                <div className="absolute right-0 mt-2 w-40 bg-[#1f1f1f] border border-gray-700 rounded shadow-lg">
-                                    <Link
-                                        href="/profile"
-                                        className="block px-4 py-2 hover:bg-gray-800"
-                                    >
-                                        Profile
-                                    </Link>
-                                    <Link
-                                        href="/billing"
-                                        className="block px-4 py-2 hover:bg-gray-800"
-                                    >
-                                        Billing & Plan
-                                    </Link>
-                                    <button
-                                        onClick={() => auth.signOut()}
-                                        className="w-full text-left px-4 py-2 hover:bg-gray-800"
-                                    >
-                                        Logout
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <Link
-                            href="/login"
-                            className="px-4 py-2 bg-[#8B5CF6] text-white rounded hover:opacity-90"
-                        >
-                            Log In
-                        </Link>
-                    )}
-                </div>
-            </header>
-
+            <TranslatorHeader
+                user={user}
+                isPro={isPro}
+                keysThisMonth={keysThisMonth}
+                FREE_TIER_KEY_LIMIT={FREE_TIER_KEY_LIMIT}
+            />
             {/* main */}
             <main className="pt-24 pb-20 mx-auto px-4 md:px-6 max-w-[1600px]">
                 <div className="flex flex-col lg:flex-row lg:space-x-6">

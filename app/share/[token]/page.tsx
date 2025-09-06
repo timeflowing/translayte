@@ -14,6 +14,7 @@ import {
     writeBatch,
 } from 'firebase/firestore';
 import { auth, db } from '@/app/lib/firebaseClient';
+import { TranslatorHeader } from '@/app/components/Header';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Types
@@ -109,16 +110,19 @@ function PresenceChip({ name = 'Editor' }: { name?: string }) {
 }
 
 function StatusPill({ status, onClick }: { status: Item['status']; onClick?: () => void }) {
-    const s = status || 'draft';
+    const isValid = typeof status === 'string' && status in STATUS_PILL;
+    const normalized = isValid ? (status as NonNullable<Item['status']>) : 'draft';
+    const label = isValid ? (status as string).replace(/_/g, ' ') : 'draft';
+
     return (
         <button
             onClick={onClick}
             className={cn(
                 'rounded-full px-2.5 py-1 text-xs font-medium leading-none',
-                STATUS_PILL[s],
+                STATUS_PILL[normalized],
             )}
         >
-            {s.replace('_', ' ')}
+            {label}
         </button>
     );
 }
@@ -160,8 +164,6 @@ function EditableCell({
     value: string;
     onCommit: (v: string) => void;
     placeholder?: string;
-    metaAt?: string;
-    metaBy?: string;
     onPresenceChange: (active: boolean) => void;
 }) {
     const [v, setV] = useState(value);
@@ -222,7 +224,6 @@ function EditableCell({
                     // Tab will blur naturally; commit happens on blur
                 }}
                 placeholder={placeholder}
-                readOnly={!auth.currentUser}
             />
         </div>
     );
@@ -329,7 +330,6 @@ export default function ShareBoardPage() {
     const token = params.token as string;
     const router = useRouter();
     const [user, authLoading] = useAuthState(auth);
-
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [data, setData] = useState<SharedPayload | null>(null);
@@ -341,9 +341,11 @@ export default function ShareBoardPage() {
     const activePresenceId = useRef<string | null>(null);
     const [isAddKeyModalOpen, setIsAddKeyModalOpen] = useState(false);
     const [isMember, setIsMember] = useState(false); // New state to track membership
+    const [selectedLanguage, setSelectedLanguage] = useState(LANG_LABELS.en.title); // New state for language selection
 
     const currentName = user?.displayName || 'You';
 
+    // Dynamically combine sourceLanguage and targetLanguages
     const langs = useMemo(
         () => (data ? [data.sourceLanguage, ...data.targetLanguages] : []),
         [data],
@@ -390,18 +392,16 @@ export default function ShareBoardPage() {
 
     // Centralized presence management
     async function updateUserPresence(presenceId: string | null) {
-        if (!auth.currentUser) return;
+        if (!auth.currentUser || !isMember) return; // ⬅️ add this guard
         if (activePresenceId.current === presenceId) return;
 
         const batch = writeBatch(db);
 
-        // Delete old presence doc if it exists
         if (activePresenceId.current) {
             const oldDocRef = doc(db, 'projects', token, 'presenceCells', activePresenceId.current);
             batch.delete(oldDocRef);
         }
 
-        // Set new presence doc if a new one is provided
         if (presenceId) {
             const newDocRef = doc(db, 'projects', token, 'presenceCells', presenceId);
             const [key, lang] = presenceId.split('::');
@@ -440,30 +440,13 @@ export default function ShareBoardPage() {
         context?: string;
         status?: Item['status'];
     }) {
-        // Optimistically update the main list of items
-        setAllItems(currentItems =>
-            currentItems.map(item => {
-                if (item.key !== update.key) return item;
-                const newValues: Record<string, string> = update.lang
-                    ? {
-                          ...item.values,
-                          [update.lang]: update.value ?? '',
-                      }
-                    : item.values;
-                // Ensure all values are strings (no undefined)
-                Object.keys(newValues).forEach(k => {
-                    if (typeof newValues[k] !== 'string') {
-                        newValues[k] = '';
-                    }
-                });
-                return {
-                    ...item,
-                    values: newValues,
-                    context: update.context ?? item.context,
-                    status: update.status ?? item.status,
-                };
-            }),
-        );
+        // Normalize the lang parameter to ensure short lowercase codes
+        const normalizedUpdate = {
+            ...update,
+            lang: update.lang ? update.lang.split('_')[0].toLowerCase() : undefined,
+        };
+
+        console.log('Sending PATCH request with update:', normalizedUpdate);
 
         saveQueue.current = saveQueue.current.then(async () => {
             const headers: HeadersInit = { 'Content-Type': 'application/json' };
@@ -471,8 +454,11 @@ export default function ShareBoardPage() {
                 headers['Authorization'] = `Bearer ${await auth.currentUser.getIdToken()}`;
             const res = await fetch(`/api/share/${token}`, {
                 method: 'PATCH',
-                headers,
-                body: JSON.stringify({ updates: [update] }),
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${await auth.currentUser?.getIdToken()}`,
+                },
+                body: JSON.stringify({ updates: [normalizedUpdate] }),
             });
             if (!res.ok) {
                 const e = await res.json().catch(() => ({}));
@@ -548,6 +534,7 @@ export default function ShareBoardPage() {
                     sourceLanguage: Lang;
                     targetLanguages: Lang[];
                     translationResult: ApiTranslationResult;
+                    statuses?: Record<string, Item['status']>;
                     pageInfo?: { page: number; pageSize: number; nextCursor?: string | null };
                     isOwner?: boolean;
                 };
@@ -559,16 +546,29 @@ export default function ShareBoardPage() {
                 }
                 const payloadFromApi: ApiResponse = await r.json();
 
-                // transform nested translationResult → Item[]
+                // Transform nested translationResult → Item[]
                 const itemsOut: Item[] = [];
                 const allKeys = new Set<string>();
+
+                // Collect all unique keys from the translationResult
                 Object.values(payloadFromApi.translationResult || {}).forEach(langObj =>
                     Object.keys(langObj || {}).forEach(k => allKeys.add(k)),
                 );
-
+                const getStatus = (key: string): Item['status'] => {
+                    const v = payloadFromApi.statuses?.[key];
+                    return typeof v === 'string' ? (v as Item['status']) : 'draft';
+                };
+                // Populate items with translations for each key
                 allKeys.forEach(key => {
                     const values: Record<Lang, string> = {};
-                    values[payloadFromApi.sourceLanguage] = ''; // source not in payload → blank
+
+                    // Add the source language translation
+                    values[payloadFromApi.sourceLanguage] =
+                        payloadFromApi.translationResult[
+                            payloadFromApi.sourceLanguage.toLowerCase()
+                        ]?.[key] || '';
+
+                    // Add the target language translations
                     payloadFromApi.targetLanguages.forEach(t => {
                         const apiLangKey = Object.keys(payloadFromApi.translationResult || {}).find(
                             k => k.toLowerCase().startsWith(t.toLowerCase()),
@@ -577,11 +577,20 @@ export default function ShareBoardPage() {
                             ? payloadFromApi.translationResult[apiLangKey]?.[key] || ''
                             : '';
                     });
+
                     itemsOut.push({
                         key,
                         values,
-                        status: 'draft',
+                        status: getStatus(key),
+                        updatedAt: new Date().toISOString(), // Add a default updatedAt field
                     });
+                });
+
+                // Sort items by `updatedAt` in descending order (newest first)
+                itemsOut.sort((a, b) => {
+                    const dateA = new Date(a.updatedAt || '').getTime();
+                    const dateB = new Date(b.updatedAt || '').getTime();
+                    return dateB - dateA;
                 });
 
                 setData({
@@ -681,7 +690,14 @@ export default function ShareBoardPage() {
 
     return (
         <div className="min-h-screen bg-[#0F0F23] text-gray-100">
-            <div className="grid grid-cols-1 lg:grid-cols-[260px,1fr,320px] gap-0">
+            <TranslatorHeader
+                user={user ? { email: user.email ?? undefined } : null}
+                isPro={true}
+                keysThisMonth={0}
+                FREE_TIER_KEY_LIMIT={0}
+            />
+            {/* Add padding to ensure content starts below the header */}
+            <div className="pt-16 grid grid-cols-1 lg:grid-cols-[120px,1fr,220px] gap-0">
                 {/* Sidebar (Projects + Languages) */}
                 <aside className="hidden lg:block h-screen sticky top-0 border-r border-gray-800 bg-[#0A0A16] p-4">
                     <div className="mb-6">
@@ -707,12 +723,6 @@ export default function ShareBoardPage() {
                                     </li>
                                 ))}
                         </ul>
-                        <button
-                            onClick={() => router.push('/new')}
-                            className="mt-4 w-full rounded-lg border border-gray-700 px-3 py-2 text-sm text-gray-300 hover:bg-gray-800/60"
-                        >
-                            + Create New Project
-                        </button>
                     </div>
                     <div>
                         <div className="mb-2 text-xs uppercase tracking-wide text-gray-500">
@@ -770,9 +780,18 @@ export default function ShareBoardPage() {
                                 <option value="draft">Draft</option>
                                 <option value="incomplete">Incomplete</option>
                             </select>
-                            <button className="rounded-lg border border-gray-700 px-3 py-2 text-sm hover:bg-gray-800/60">
-                                Filters
-                            </button>
+                            {/* Added functionality to filter translations by language */}
+                            <select
+                                value={selectedLanguage}
+                                onChange={e => setSelectedLanguage(e.target.value)}
+                                className="rounded-lg bg-[#0B0B1A] px-3 py-2 text-sm ring-1 ring-gray-800 focus:ring-2 focus:ring-[#8B5CF6]"
+                            >
+                                {[data.sourceLanguage, ...data.targetLanguages].map(lang => (
+                                    <option key={lang} value={lang}>
+                                        {LANG_LABELS[lang]?.title || lang}
+                                    </option>
+                                ))}
+                            </select>
                             <button
                                 onClick={() => setIsAddKeyModalOpen(true)}
                                 className="rounded-lg bg-[#8B5CF6] px-3 py-2 text-sm hover:bg-[#7C3AED]"
@@ -798,133 +817,98 @@ export default function ShareBoardPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-800 bg-[#0B0B1A]">
-                                {itemsOnCurrentPage.map(row => {
-                                    const rowHasPresence = langs.find(
-                                        l => presence[`${row.key}::${l}`],
-                                    );
-                                    const editorName = rowHasPresence
-                                        ? presence[`${row.key}::${rowHasPresence}`]?.name
-                                        : undefined;
-
-                                    return (
-                                        <tr key={row.key} className="align-top hover:bg-[#0f0f24]">
-                                            <td className="px-3 py-2">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-mono text-xs text-gray-300">
-                                                        {row.key}
-                                                    </span>
-                                                    {rowHasPresence && (
-                                                        <PresenceChip
-                                                            name={editorName || 'Editor'}
-                                                        />
-                                                    )}
-                                                </div>
-                                                <div className="mt-1 text-[11px] text-gray-500">
-                                                    {row.updatedAt && row.updatedBy?.name && (
-                                                        <>
-                                                            {timeAgo(row.updatedAt)} • by{' '}
-                                                            <span className="text-gray-300">
-                                                                {row.updatedBy.name}
-                                                            </span>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </td>
-
-                                            {langs.map(l => (
-                                                <td key={l} className="px-3 py-2">
-                                                    <EditableCell
-                                                        value={row.values[l] || ''}
-                                                        placeholder={`Edit ${l.toUpperCase()}…`}
-                                                        metaAt={row.updatedAt}
-                                                        metaBy={row.updatedBy?.name}
-                                                        onPresenceChange={active => {
-                                                            const presenceId = `${row.key}::${l}`;
-                                                            updateUserPresence(
-                                                                active ? presenceId : null,
+                                {itemsOnCurrentPage.map(row => (
+                                    <tr key={row.key} className="align-top hover:bg-[#0f0f24]">
+                                        <td className="px-3 py-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-mono text-xs text-gray-300">
+                                                    {row.key}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        {langs.map(l => (
+                                            <td key={l} className="px-3 py-2">
+                                                <EditableCell
+                                                    value={row.values[l] || ''}
+                                                    placeholder={`Edit ${l.toUpperCase()}…`}
+                                                    onPresenceChange={active => {
+                                                        const presenceId = `${row.key}::${l}`;
+                                                        updateUserPresence(
+                                                            active ? presenceId : null,
+                                                        );
+                                                    }}
+                                                    onCommit={async val => {
+                                                        if (!auth.currentUser) {
+                                                            alert(
+                                                                'Please sign in to save changes.',
                                                             );
-                                                        }}
-                                                        onCommit={async val => {
-                                                            if (!auth.currentUser) {
-                                                                alert(
-                                                                    'Please sign in to save changes.',
-                                                                );
-                                                                return;
-                                                            }
-                                                            // Optimistic update
-                                                            setAllItems(rs =>
-                                                                rs.map(r =>
-                                                                    r.key === row.key
-                                                                        ? {
-                                                                              ...r,
-                                                                              values: {
-                                                                                  ...r.values,
-                                                                                  [l]: val,
-                                                                              },
-                                                                              updatedAt:
-                                                                                  new Date().toISOString(),
-                                                                              updatedBy: {
-                                                                                  uid: auth.currentUser!
-                                                                                      .uid,
-                                                                                  name: currentName,
-                                                                              },
-                                                                          }
-                                                                        : r,
-                                                                ),
-                                                            );
-                                                            await commitDelta({
-                                                                key: row.key,
-                                                                lang: l,
-                                                                value: val,
-                                                            });
-                                                        }}
-                                                    />
-                                                </td>
-                                            ))}
-
-                                            <td className="px-3 py-2">
-                                                <StatusPill
-                                                    status={row.status}
-                                                    onClick={async () => {
-                                                        const order: Required<Item>['status'][] = [
-                                                            'draft',
-                                                            'in_review',
-                                                            'approved',
-                                                            'incomplete',
-                                                        ];
-                                                        const cur = row.status || 'draft';
-                                                        const next =
-                                                            order[
-                                                                (order.indexOf(cur) + 1) %
-                                                                    order.length
-                                                            ];
+                                                            return;
+                                                        }
                                                         // Optimistic update
                                                         setAllItems(rs =>
                                                             rs.map(r =>
                                                                 r.key === row.key
-                                                                    ? { ...r, status: next }
+                                                                    ? {
+                                                                          ...r,
+                                                                          values: {
+                                                                              ...r.values,
+                                                                              [l]: val,
+                                                                          },
+                                                                      }
                                                                     : r,
                                                             ),
                                                         );
                                                         await commitDelta({
                                                             key: row.key,
-                                                            status: next,
+                                                            lang: l,
+                                                            value: val,
                                                         });
                                                     }}
                                                 />
                                             </td>
-                                            <td className="px-3 py-2 text-right">
-                                                <button
-                                                    className="grid h-7 w-7 place-items-center rounded-md bg-gray-800 hover:bg-gray-700"
-                                                    title="Row menu"
-                                                    onClick={() => setSelected(row)}
-                                                >
-                                                    ⋮
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
+                                        ))}
+
+                                        <td className="px-3 py-2">
+                                            <StatusPill
+                                                status={row.status}
+                                                onClick={async () => {
+                                                    const order: Required<Item>['status'][] = [
+                                                        'draft',
+                                                        'in_review',
+                                                        'approved',
+                                                        'incomplete',
+                                                    ];
+                                                    const cur = row.status || 'draft';
+                                                    const next =
+                                                        order[
+                                                            (order.indexOf(cur) + 1) % order.length
+                                                        ];
+                                                    // Optimistic update
+                                                    setAllItems(rs =>
+                                                        rs.map(r =>
+                                                            r.key === row.key
+                                                                ? { ...r, status: next }
+                                                                : r,
+                                                        ),
+                                                    );
+                                                    await commitDelta({
+                                                        key: row.key,
+                                                        status: next,
+                                                    });
+                                                }}
+                                            />
+                                        </td>
+                                        <td className="px-3 py-2 text-right">
+                                            <button
+                                                className="grid h-7 w-7 place-items-center rounded-md bg-gray-800 hover:bg-gray-700"
+                                                title="Row menu"
+                                                onClick={() => setSelected(row)}
+                                            >
+                                                ⋮
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
                                 {itemsOnCurrentPage.length === 0 && (
                                     <tr>
                                         <td
@@ -977,8 +961,6 @@ export default function ShareBoardPage() {
                                                 <EditableCell
                                                     value={row.values[l] || ''}
                                                     placeholder={`Edit ${l.toUpperCase()}…`}
-                                                    metaAt={row.updatedAt}
-                                                    metaBy={row.updatedBy?.name}
                                                     onPresenceChange={active => {
                                                         const presenceId = `${row.key}::${l}`;
                                                         updateUserPresence(
@@ -1315,6 +1297,28 @@ function Footer({
                     className="rounded-lg bg-gray-700 px-3 py-2 text-gray-100 hover:bg-gray-600"
                 >
                     Copy All as JSON
+                </button>
+                <button
+                    onClick={() => {
+                        const exportObj: Record<string, Record<string, string>> = {};
+                        langs.forEach(l => (exportObj[l] = {}));
+                        items.forEach(r =>
+                            langs.forEach(l => (exportObj[l][r.key] = r.values[l] || '')),
+                        );
+                        const txt = JSON.stringify(exportObj, null, 2);
+                        const blob = new Blob([txt], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'translations.json';
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        URL.revokeObjectURL(url);
+                    }}
+                    className="rounded-lg bg-gray-700 px-3 py-2 text-gray-100 hover:bg-gray-600"
+                >
+                    Download JSON
                 </button>
             </div>
         </div>

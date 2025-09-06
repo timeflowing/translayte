@@ -26,6 +26,7 @@
     "lucide-react": "^0.536.0",
     "netlify": "^13.2.0",
     "next": "^15.0.4",
+    "next-auth": "^4.24.11",
     "openai": "^4.104.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -40,6 +41,7 @@
     "vanta": "^0.5.24"
   },
   "devDependencies": {
+    "@types/next-auth": "^3.13.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

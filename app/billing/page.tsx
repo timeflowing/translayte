@@ -73,7 +73,37 @@ const BillingPage = () => {
     }, [user]);
 
     const handleCancel = async () => {
-        window.open('https://billing.stripe.com/p/login', '_blank');
+        try {
+            // @ts-expect-error: accessToken is available
+            const accessToken = user?.accessToken || user?.stsTokenManager?.accessToken;
+            const response = await fetch('/api/subscription/cancel', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${accessToken}`,
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to cancel subscription.');
+            }
+
+            alert('Your subscription has been successfully canceled.');
+            setBilling(prev => {
+                if (!prev || !prev.subscription) return prev;
+                return {
+                    ...prev,
+                    subscription: {
+                        ...prev.subscription,
+                        status: 'canceled',
+                        plan: prev.subscription.plan || '', // Ensure plan is not undefined
+                    },
+                };
+            });
+        } catch (error) {
+            console.error('Error canceling subscription:', error);
+            alert('An error occurred while canceling your subscription. Please try again.');
+        }
     };
 
     return (

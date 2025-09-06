@@ -1,0 +1,1 @@
+export const FREE_TIER_KEY_LIMIT = 69;
