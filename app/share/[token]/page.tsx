@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import {
     collection,
@@ -327,7 +327,7 @@ function AddKeyModal({
 // ──────────────────────────────────────────────────────────────────────────────
 export default function ShareBoardPage() {
     const params = useParams();
-    const token = params.token as string;
+    const token = params?.token;
     const router = useRouter();
     const [user, authLoading] = useAuthState(auth);
     const [loading, setLoading] = useState(true);
@@ -355,18 +355,21 @@ export default function ShareBoardPage() {
     const [presence, setPresence] = useState<Record<string, { name: string }>>({});
     useEffect(() => {
         // Only set up the listener if the user is a confirmed member of the project.
-        if (!user || !isMember) {
+        if (!user || !isMember || !token) {
             setPresence({});
             return;
         }
-        const unsub = onSnapshot(collection(db, 'projects', token, 'presenceCells'), snap => {
-            const m: Record<string, { name: string }> = {};
-            snap.forEach(d => {
-                const x = d.data();
-                m[d.id] = { name: x.name || 'Editor' };
-            });
-            setPresence(m);
-        });
+        const unsub = onSnapshot(
+            collection(db, 'projects', token as string, 'presenceCells'),
+            snap => {
+                const m: Record<string, { name: string }> = {};
+                snap.forEach(d => {
+                    const x = d.data();
+                    m[d.id] = { name: x.name || 'Editor' };
+                });
+                setPresence(m);
+            },
+        );
         return () => unsub();
     }, [token, user, isMember]); // Add isMember to dependencies
 
@@ -391,36 +394,50 @@ export default function ShareBoardPage() {
     }, [allItems, q, status]);
 
     // Centralized presence management
-    async function updateUserPresence(presenceId: string | null) {
-        if (!auth.currentUser || !isMember) return; // ⬅️ add this guard
-        if (activePresenceId.current === presenceId) return;
+    const updateUserPresence = useCallback(
+        async (presenceId: string | null) => {
+            if (!auth.currentUser || !isMember) return;
+            if (activePresenceId.current === presenceId) return;
 
-        const batch = writeBatch(db);
+            // Ensure token is a string
+            const projectId =
+                typeof token === 'string' ? token : Array.isArray(token) ? token[0] : '';
+            if (!projectId) return;
 
-        if (activePresenceId.current) {
-            const oldDocRef = doc(db, 'projects', token, 'presenceCells', activePresenceId.current);
-            batch.delete(oldDocRef);
-        }
+            const batch = writeBatch(db);
 
-        if (presenceId) {
-            const newDocRef = doc(db, 'projects', token, 'presenceCells', presenceId);
-            const [key, lang] = presenceId.split('::');
-            batch.set(newDocRef, {
-                key,
-                lang: lang || 'context',
-                uid: auth.currentUser.uid,
-                name: auth.currentUser.displayName || 'You',
-                updatedAt: serverTimestamp(),
-            });
-        }
+            if (activePresenceId.current) {
+                const oldDocRef = doc(
+                    db,
+                    'projects',
+                    projectId,
+                    'presenceCells',
+                    activePresenceId.current,
+                );
+                batch.delete(oldDocRef);
+            }
 
-        try {
-            await batch.commit();
-            activePresenceId.current = presenceId;
-        } catch (e) {
-            console.error('Failed to update presence', e);
-        }
-    }
+            if (presenceId) {
+                const newDocRef = doc(db, 'projects', projectId, 'presenceCells', presenceId);
+                const [key, lang] = presenceId.split('::');
+                batch.set(newDocRef, {
+                    key,
+                    lang: lang || 'context',
+                    uid: auth.currentUser.uid,
+                    name: auth.currentUser.displayName || 'You',
+                    updatedAt: serverTimestamp(),
+                });
+            }
+
+            try {
+                await batch.commit();
+                activePresenceId.current = presenceId;
+            } catch (e) {
+                console.error('Failed to update presence', e);
+            }
+        },
+        [isMember, token],
+    );
 
     // Cleanup presence on page unload
     useEffect(() => {
@@ -656,7 +673,7 @@ export default function ShareBoardPage() {
     // For logged-out users (or fetch error), at least show the current project in sidebar
     useEffect(() => {
         if (!user && data && projects.length === 0) {
-            setProjects([{ id: token, name: data.fileName }]);
+            setProjects([{ id: String(token), name: data.fileName }]);
         }
     }, [data, user, projects.length, token]);
 
