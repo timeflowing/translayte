@@ -50,7 +50,7 @@ const ProjectPage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const params = useParams();
-    const projectId = params.id as string;
+    const projectId = params.id;
 
     // Fetch project details
     useEffect(() => {
