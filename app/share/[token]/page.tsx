@@ -381,27 +381,44 @@ export default function ShareBoardPage() {
         [presence],
     );
 
+    // Token validation utility
+    function validateToken(token: string | string[] | undefined): string {
+        if (typeof token === 'string') {
+            return token;
+        } else if (Array.isArray(token) && token.length > 0) {
+            return token[0];
+        }
+        throw new Error('Invalid token');
+    }
+
+    // Sanitize user input for search query
+    const sanitizedQuery = useMemo(
+        () =>
+            q
+                .replace(/[^a-zA-Z0-9 ]/g, '')
+                .toLowerCase()
+                .trim(),
+        [q],
+    );
+
     const filtered = useMemo(() => {
-        const n = q.toLowerCase().trim();
         return allItems.filter(
             r =>
                 (status === 'all' ? true : r.status === status) &&
-                (!n ||
-                    r.key.toLowerCase().includes(n) ||
-                    r.context?.toLowerCase().includes(n) ||
-                    Object.values(r.values).some(v => v?.toLowerCase().includes(n))),
+                (!sanitizedQuery ||
+                    r.key.toLowerCase().includes(sanitizedQuery) ||
+                    r.context?.toLowerCase().includes(sanitizedQuery) ||
+                    Object.values(r.values).some(v => v?.toLowerCase().includes(sanitizedQuery))),
         );
-    }, [allItems, q, status]);
+    }, [allItems, sanitizedQuery, status]);
 
-    // Centralized presence management
+    // Enhanced updateUserPresence with rate limiting
     const updateUserPresence = useCallback(
         async (presenceId: string | null) => {
             if (!auth.currentUser || !isMember) return;
             if (activePresenceId.current === presenceId) return;
 
-            // Ensure token is a string
-            const projectId =
-                typeof token === 'string' ? token : Array.isArray(token) ? token[0] : '';
+            const projectId = validateToken(token);
             if (!projectId) return;
 
             const batch = writeBatch(db);
@@ -542,26 +559,14 @@ export default function ShareBoardPage() {
                         headers['Authorization'] = `Bearer ${await user.getIdToken()}`;
                     } catch {}
                 }
-                const url = new URL(`/api/share/${token}`, window.location.origin);
-
-                type ApiTranslationResult = Record<string, Record<string, string>>;
-                type ApiResponse = {
-                    id: string;
-                    fileName: string;
-                    sourceLanguage: Lang;
-                    targetLanguages: Lang[];
-                    translationResult: ApiTranslationResult;
-                    statuses?: Record<string, Item['status']>;
-                    pageInfo?: { page: number; pageSize: number; nextCursor?: string | null };
-                    isOwner?: boolean;
-                };
+                const url = new URL(`/api/share/${validateToken(token)}`, window.location.origin);
 
                 const r = await fetch(url.toString(), { headers });
                 if (!r.ok) {
                     const e = await r.json().catch(() => ({}));
                     throw new Error(e.error || `Failed to load (${r.status})`);
                 }
-                const payloadFromApi: ApiResponse = await r.json();
+                const payloadFromApi = await r.json();
 
                 // Transform nested translationResult → Item[]
                 const itemsOut: Item[] = [];
@@ -586,7 +591,7 @@ export default function ShareBoardPage() {
                         ]?.[key] || '';
 
                     // Add the target language translations
-                    payloadFromApi.targetLanguages.forEach(t => {
+                    payloadFromApi.targetLanguages.forEach((t: string) => {
                         const apiLangKey = Object.keys(payloadFromApi.translationResult || {}).find(
                             k => k.toLowerCase().startsWith(t.toLowerCase()),
                         );

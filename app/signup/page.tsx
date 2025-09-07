@@ -21,6 +21,23 @@ const RegisterPage = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            setError('Please enter a valid email address.');
+            return;
+        }
+
+        // Adjusted password validation to allow the provided password
+        const passwordStrengthRegex = /^(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&\-]{8,}$/;
+        if (!passwordStrengthRegex.test(password)) {
+            setError(
+                'Password must be at least 8 characters long, include an uppercase letter, a number, and optionally a special character.',
+            );
+            return;
+        }
+
         if (!agreed) {
             setError('You must agree to the Terms and Conditions.');
             return;
@@ -29,18 +46,24 @@ const RegisterPage = () => {
             setError('Passwords do not match.');
             return;
         }
-        if (password.length < 6) {
-            setError('Password must be at least 6 characters long.');
-            return;
-        }
+
         setCreating(true);
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
             await updateProfile(user, { displayName });
             router.push('/'); // Redirect to home or desired page
-        } catch {
-            setError('Failed to create an account. Please try again.');
+        } catch (error) {
+            const firebaseError = error as { code?: string; message?: string };
+            console.error('Firebase error:', firebaseError);
+            // Parse Firebase error codes
+            const errorMessage =
+                firebaseError.code === 'auth/email-already-in-use'
+                    ? 'This email is already in use. Please use a different email.'
+                    : firebaseError.code === 'auth/weak-password'
+                    ? 'The password is too weak. Please choose a stronger password.'
+                    : firebaseError.message || 'Failed to create an account. Please try again.';
+            setError(errorMessage);
             setCreating(false);
         }
     };
