@@ -56,10 +56,10 @@ const STATUS_PILL: Record<NonNullable<Item['status']>, string> = {
     incomplete: 'bg-rose-700 text-white',
 };
 
-const LANG_LABELS: Record<string, { title: string; subtitle?: string }> = {
-    en: { title: 'EN English', subtitle: 'Source' },
-    cs: { title: 'CS Czech' },
-    it: { title: 'IT Italian' },
+const LANG_LABELS: Record<string, { title: string; name?: string; subtitle?: string }> = {
+    en: { title: 'EN English', name: 'English', subtitle: 'Source' },
+    cs: { title: 'CS Czech', name: 'Czech' },
+    it: { title: 'IT Italian', name: 'Italian' },
 };
 
 function cn(...xs: Array<string | false | null | undefined>) {
@@ -751,13 +751,13 @@ export default function ShareBoardPage() {
                             Languages
                         </div>
                         <ul className="space-y-1 text-sm">
-                            {[data.sourceLanguage, ...data.targetLanguages].map(l => (
+                            {[data.sourceLanguage, ...data.targetLanguages].map(lang => (
                                 <li
-                                    key={l}
+                                    key={lang}
                                     className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-[#14142a]"
                                 >
                                     <span className="inline-block h-2 w-2 rounded-full bg-violet-500" />{' '}
-                                    {l.toUpperCase()}
+                                    {LANG_LABELS[lang]?.name || lang}
                                 </li>
                             ))}
                         </ul>
@@ -835,12 +835,15 @@ export default function ShareBoardPage() {
                                         </th>
                                     ))}
                                     <th className="w-24 px-3 py-3">Status</th>
-                                    <th className="w-20 px-3 py-3">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-800 bg-[#0B0B1A]">
                                 {itemsOnCurrentPage.map(row => (
-                                    <tr key={row.key} className="align-top hover:bg-[#0f0f24]">
+                                    <tr
+                                        key={row.key}
+                                        className="align-top hover:bg-[#0f0f24] cursor-pointer"
+                                        onClick={() => setSelected(row)}
+                                    >
                                         <td className="px-3 py-2">
                                             <div className="flex items-center gap-2">
                                                 <span className="font-mono text-xs text-gray-300">
@@ -920,21 +923,12 @@ export default function ShareBoardPage() {
                                                 }}
                                             />
                                         </td>
-                                        <td className="px-3 py-2 text-right">
-                                            <button
-                                                className="grid h-7 w-7 place-items-center rounded-md bg-gray-800 hover:bg-gray-700"
-                                                title="Row menu"
-                                                onClick={() => setSelected(row)}
-                                            >
-                                                ⋮
-                                            </button>
-                                        </td>
                                     </tr>
                                 ))}
                                 {itemsOnCurrentPage.length === 0 && (
                                     <tr>
                                         <td
-                                            colSpan={4 + langs.length}
+                                            colSpan={3 + langs.length}
                                             className="px-3 py-12 text-center text-gray-400"
                                         >
                                             No items
@@ -1161,48 +1155,6 @@ export default function ShareBoardPage() {
                                             </li>
                                         ))}
                                 </ul>
-                            </section>
-
-                            {/* Actions */}
-                            <section>
-                                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                    Actions
-                                </h4>
-                                <div className="grid grid-cols-1 gap-2">
-                                    <button
-                                        className="rounded-md bg-[#8B5CF6] px-3 py-2 text-xs hover:bg-[#7C3AED]"
-                                        onClick={async () => {
-                                            if (!auth.currentUser)
-                                                return alert('Sign in to update.');
-                                            // Optimistic update
-                                            setAllItems(rs =>
-                                                rs.map(r =>
-                                                    r.key === selected.key
-                                                        ? { ...r, status: 'approved' }
-                                                        : r,
-                                                ),
-                                            );
-                                            setSelected(s =>
-                                                s ? { ...s, status: 'approved' } : s,
-                                            );
-                                            await commitDelta({
-                                                key: selected.key,
-                                                status: 'approved',
-                                            });
-                                        }}
-                                    >
-                                        Approve
-                                    </button>
-                                    <button className="rounded-md bg-gray-800 px-3 py-2 text-xs hover:bg-gray-700">
-                                        Assign
-                                    </button>
-                                    <button className="rounded-md bg-gray-800 px-3 py-2 text-xs hover:bg-gray-700">
-                                        Add Comment
-                                    </button>
-                                    <button className="rounded-md bg-gray-800 px-3 py-2 text-xs hover:bg-gray-700">
-                                        Machine Translate
-                                    </button>
-                                </div>
                             </section>
                         </div>
                     )}

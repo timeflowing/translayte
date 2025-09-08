@@ -417,21 +417,22 @@ export default function TranslatorPage() {
             Object.keys(translationResult).length > 0 &&
             isUserTranslation
         ) {
-            const saveHistory = async () => {
-                try {
-                    await addDoc(collection(db, 'translations'), {
-                        userId: user?.uid,
-                        fileName: fileName ?? 'Untitled',
-                        sourceLanguage: 'EN',
-                        targetLanguages: Array.from(selectedShortcuts),
-                        translationResult,
-                        createdAt: serverTimestamp(),
-                    });
-                } catch {
-                    // Optionally handle error
-                }
-            };
-            saveHistory();
+            // Removed redundant saveHistory function to prevent duplicate entries
+            // const saveHistory = async () => {
+            //     try {
+            //         await addDoc(collection(db, 'translations'), {
+            //             userId: user?.uid,
+            //             fileName: fileName ?? 'Untitled',
+            //             sourceLanguage: 'EN',
+            //             targetLanguages: Array.from(selectedShortcuts),
+            //             translationResult,
+            //             createdAt: serverTimestamp(),
+            //         });
+            //     } catch {
+            //         // Optionally handle error
+            //     }
+            // };
+            // saveHistory();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [translationResult]);
@@ -527,16 +528,18 @@ export default function TranslatorPage() {
                         updatedAt: serverTimestamp(),
                     });
                 } else {
-                    // Create a new translation only if `translationId` is not set
-                    const docRef = await addDoc(collection(db, 'translations'), {
-                        userId: user.uid,
-                        fileName: fileName ?? 'Untitled',
-                        sourceLanguage: sourceLanguageCode,
-                        targetLanguages: Array.from(selectedShortcuts),
-                        translationResult: finalResult,
-                        createdAt: serverTimestamp(),
-                    });
-                    setTranslationId(docRef.id); // Set the translation ID to avoid duplicate saves
+                    // Ensure no duplicate saves by checking if translationId is already set
+                    if (!translationId) {
+                        const docRef = await addDoc(collection(db, 'translations'), {
+                            userId: user.uid,
+                            fileName: fileName ?? 'Untitled',
+                            sourceLanguage: sourceLanguageCode,
+                            targetLanguages: Array.from(selectedShortcuts),
+                            translationResult: finalResult,
+                            createdAt: serverTimestamp(),
+                        });
+                        setTranslationId(docRef.id); // Set the translation ID to avoid duplicate saves
+                    }
                 }
             }
         } catch (e) {
@@ -663,7 +666,6 @@ export default function TranslatorPage() {
         const userUnsub = onSnapshot(doc(db, 'users', user.uid), snap => {
             const userData = snap.data();
             setKeysThisMonth(userData?.keys_month || 0);
-            setCharsThisMonth(userData?.chars_month || 0);
         });
 
         // FIX: Listen to the correct collection for subscription status
@@ -865,6 +867,7 @@ export default function TranslatorPage() {
         setJsonInput(content);
         setFileName(name);
     };
+
     return (
         <>
             {/* background layer */}
