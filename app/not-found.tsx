@@ -65,7 +65,7 @@ export default function ErrorPage({
                 <div className="mt-8 text-xs text-gray-500">
                     <span>Need help?</span>{' '}
                     <a
-                        href="mailto:support@translaye.it"
+                        href="mailto:support@translayte.it"
                         className="underline hover:text-[#A78BFA]"
                     >
                         Contact support

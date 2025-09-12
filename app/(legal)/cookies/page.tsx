@@ -51,7 +51,7 @@ export default function Page() {
 
             <h2>5. Contact</h2>
             <p>
-                Questions? <a href="mailto:support@phrasey.it">support@phrasey.it</a>
+                Questions? <a href="mailto:support@translayte.it">support@translayte.it</a>
             </p>
         </LegalShell>
     );

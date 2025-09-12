@@ -53,14 +53,14 @@ export default function Page() {
 
             <h2>6. How to Cancel or Request a Refund</h2>
             <p>
-                Email <a href="mailto:support@phrasey.it">support@phrasey.it</a> from your account
-                email. Include your invoice ID and a brief description.
+                Email <a href="mailto:support@translayte.it">support@translayte.it</a> from your
+                account email. Include your invoice ID and a brief description.
             </p>
 
             <h2>7. Contact</h2>
             <p>
                 Operator: <strong>Vojtěch Tomášek</strong> —{' '}
-                <a href="mailto:support@phrasey.it">support@phrasey.it</a>
+                <a href="mailto:support@translayte.it">support@translayte.it</a>
             </p>
         </LegalShell>
     );

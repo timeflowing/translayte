@@ -96,7 +96,7 @@ export default function Page() {
                 </li>
                 <li>
                     To exercise rights, email{' '}
-                    <a href="mailto:support@Phrasey.it">support@Phrasey.it</a>.
+                    <a href="mailto:support@translayte.it">support@translayte.it</a>.
                 </li>
                 <li>You may lodge a complaint with your supervisory authority (in CZ: ÚOOÚ).</li>
             </ul>
@@ -117,7 +117,7 @@ export default function Page() {
             <p>
                 Data Controller: <strong>Vojtěch Tomášek</strong>,{' '}
                 <strong>17.listopadu 7, Zábřeh</strong>. Email:{' '}
-                <a href="mailto:support@Phrasey.it">support@Phrasey.it</a>.
+                <a href="mailto:support@translayte.it">support@translayte.it</a>.
             </p>
         </LegalShell>
     );

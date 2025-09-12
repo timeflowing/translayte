@@ -610,7 +610,7 @@ const LandingPage = () => {
                             Privacy Policy
                         </span>
                         <span className="text-gray-300 hover:text-white transition-colors cursor-pointer">
-                            Contact: support@translaye.it
+                            Contact: support@translayte.it
                         </span>
                     </div> */}
                     <LegalFooterLinks />

@@ -14,7 +14,7 @@ export default function Page() {
                 Phrasey (the &quot;Service&quot;) is operated by <strong>Vojtěch Tomášek</strong>,
                 Business ID <strong>08450897</strong>, registered at
                 <strong> 17.listopadu 7, Zábřeh</strong>. Contact:{' '}
-                <strong>support@phrasey.it</strong>.
+                <strong>support@translayte.it</strong>.
             </p>
 
             <h2>1. Acceptance of Terms</h2>
@@ -160,7 +160,7 @@ export default function Page() {
 
             <h2>17. Contact</h2>
             <p>
-                Questions? Contact <a href="mailto:support@phrasey.it">support@phrasey.it</a>.
+                Questions? Contact <a href="mailto:support@translayte.it">support@translayte.it</a>.
             </p>
         </LegalShell>
     );
