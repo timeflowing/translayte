@@ -342,6 +342,7 @@ export default function ShareBoardPage() {
     const [isAddKeyModalOpen, setIsAddKeyModalOpen] = useState(false);
     const [isMember, setIsMember] = useState(false); // New state to track membership
     const [selectedLanguage, setSelectedLanguage] = useState(LANG_LABELS.en.title); // New state for language selection
+    const [filteredItems, setFilteredItems] = useState<Item[]>(allItems); // New state for filtered items
 
     const currentName = user?.displayName || 'You';
 
@@ -545,8 +546,8 @@ export default function ShareBoardPage() {
     const itemsOnCurrentPage = useMemo(() => {
         const start = (page - 1) * pageSize;
         const end = start + pageSize;
-        return filtered.slice(start, end);
-    }, [filtered, page, pageSize]);
+        return filteredItems.slice(start, end);
+    }, [filteredItems, page, pageSize]);
 
     // Main data loading and project fetching effect.
     // This effect now correctly handles re-loading when the user or project token changes.
@@ -625,6 +626,7 @@ export default function ShareBoardPage() {
                     pageInfo: payloadFromApi.pageInfo,
                 });
                 setAllItems(itemsOut);
+                setFilteredItems(itemsOut); // Initialize filtered items
             } catch (e) {
                 setError(
                     typeof e === 'object' && e !== null && 'message' in e
@@ -710,6 +712,10 @@ export default function ShareBoardPage() {
         );
     }
 
+    function setFilterLanguage(lang: string): void {
+        setSelectedLanguage(lang);
+        setFilteredItems(allItems.filter(item => Object.keys(item.values).includes(lang)));
+    }
     return (
         <div className="min-h-screen bg-[#0F0F23] text-gray-100">
             <TranslatorHeader
@@ -728,20 +734,30 @@ export default function ShareBoardPage() {
                         </div>
                         <ul className="space-y-1">
                             {projects
-                                .filter(p => p.id) // Critical fix: Ensure project ID is not empty or null
+                                .filter(p => p.id) // Ensure project ID is not empty or null
                                 .map(project => (
                                     <li
                                         key={project.id}
                                         onClick={() => router.push(`/share/${project.id}`)}
                                         className={cn(
-                                            'truncate rounded-lg px-3 py-2 text-sm cursor-pointer',
+                                            'truncate rounded-lg px-3 py-2 text-sm cursor-pointer flex justify-between items-center',
                                             project.id === token
                                                 ? 'bg-[#17172e] text-white ring-1 ring-violet-800/30'
                                                 : 'text-gray-400 hover:bg-[#14142a]',
                                         )}
                                         title={project.name}
                                     >
-                                        {project.name}
+                                        <span>{project.name}</span>
+                                        <button
+                                            onClick={e => {
+                                                e.stopPropagation();
+                                                // Add delete functionality here
+                                                alert(`Delete project ${project.name}`);
+                                            }}
+                                            className="text-red-500 hover:text-red-700"
+                                        >
+                                            Delete
+                                        </button>
                                     </li>
                                 ))}
                         </ul>
@@ -754,7 +770,8 @@ export default function ShareBoardPage() {
                             {[data.sourceLanguage, ...data.targetLanguages].map(lang => (
                                 <li
                                     key={lang}
-                                    className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-[#14142a]"
+                                    className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-[#14142a] cursor-pointer"
+                                    onClick={() => setFilterLanguage(lang)} // Replace alert with filtering logic
                                 >
                                     <span className="inline-block h-2 w-2 rounded-full bg-violet-500" />{' '}
                                     {LANG_LABELS[lang]?.name || lang}

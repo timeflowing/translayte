@@ -12,8 +12,8 @@ export default function Page() {
             subtitle="Your choices about cookies and similar technologies"
         >
             <p>
-                This Cookie Policy explains how Translayte uses cookies and similar technologies on
-                <strong> https://translayte.it</strong>.
+                This Cookie Policy explains how Phrasey uses cookies and similar technologies on
+                <strong> https://phrasey.it</strong>.
             </p>
 
             <h2>1. What Are Cookies?</h2>
@@ -51,7 +51,7 @@ export default function Page() {
 
             <h2>5. Contact</h2>
             <p>
-                Questions? <a href="mailto:support@translayte.it">support@translayte.it</a>
+                Questions? <a href="mailto:support@phrasey.it">support@phrasey.it</a>
             </p>
         </LegalShell>
     );

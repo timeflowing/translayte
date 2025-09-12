@@ -10,7 +10,7 @@ const NavigationBar = () => (
     <nav className="w-full bg-[#232136] border-b border-[#8B5CF6]/20 py-3 px-6 flex items-center justify-between mb-8 rounded-b-xl shadow-lg">
         <div className="flex items-center gap-4">
             <Link href="/" className="text-white font-bold text-lg hover:text-[#A78BFA]">
-                Translayte
+                Phrasey
             </Link>
             <Link href="/translator" className="text-gray-300 hover:text-[#A78BFA]">
                 Translate

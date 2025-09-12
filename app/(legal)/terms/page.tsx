@@ -9,12 +9,12 @@ export const metadata = {
 
 export default function Page() {
     return (
-        <LegalShell title="Terms of Service" subtitle="Contractual terms for using Translayte">
+        <LegalShell title="Terms of Service" subtitle="Contractual terms for using Phrasey">
             <p>
-                Translayte (the &quot;Service&quot;) is operated by <strong>Vojtěch Tomášek</strong>
-                , Business ID <strong>08450897</strong>, registered at
+                Phrasey (the &quot;Service&quot;) is operated by <strong>Vojtěch Tomášek</strong>,
+                Business ID <strong>08450897</strong>, registered at
                 <strong> 17.listopadu 7, Zábřeh</strong>. Contact:{' '}
-                <strong>support@translayte.it</strong>.
+                <strong>support@phrasey.it</strong>.
             </p>
 
             <h2>1. Acceptance of Terms</h2>
@@ -25,9 +25,9 @@ export default function Page() {
 
             <h2>2. The Service</h2>
             <p>
-                Translayte enables users to translate text and files (including JSON) via
-                third‑party artificial intelligence APIs. Output quality may vary depending on
-                input, model choice, and context.
+                Phrasey enables users to translate text and files (including JSON) via third‑party
+                artificial intelligence APIs. Output quality may vary depending on input, model
+                choice, and context.
             </p>
 
             <h2>3. Accounts & Security</h2>
@@ -160,7 +160,7 @@ export default function Page() {
 
             <h2>17. Contact</h2>
             <p>
-                Questions? Contact <a href="mailto:support@translayte.it">support@translayte.it</a>.
+                Questions? Contact <a href="mailto:support@phrasey.it">support@phrasey.it</a>.
             </p>
         </LegalShell>
     );

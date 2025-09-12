@@ -13,8 +13,8 @@ export default function Page() {
         >
             <h2>1. Scope</h2>
             <p>
-                This policy applies to purchases made directly from Translayte. If you purchased via
-                a third party, their terms apply.
+                This policy applies to purchases made directly from Phrasey. If you purchased via a
+                third party, their terms apply.
             </p>
 
             <h2>2. EU Right of Withdrawal (Consumers)</h2>
@@ -53,14 +53,14 @@ export default function Page() {
 
             <h2>6. How to Cancel or Request a Refund</h2>
             <p>
-                Email <a href="mailto:support@translayte.it">support@translayte.it</a> from your
-                account email. Include your invoice ID and a brief description.
+                Email <a href="mailto:support@phrasey.it">support@phrasey.it</a> from your account
+                email. Include your invoice ID and a brief description.
             </p>
 
             <h2>7. Contact</h2>
             <p>
                 Operator: <strong>Vojtěch Tomášek</strong> —{' '}
-                <a href="mailto:support@translayte.it">support@translayte.it</a>
+                <a href="mailto:support@phrasey.it">support@phrasey.it</a>
             </p>
         </LegalShell>
     );
