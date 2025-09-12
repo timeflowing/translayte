@@ -22,7 +22,7 @@ export function TranslatorHeader({
             <div className="container mx-auto px-4 py-4 flex items-center justify-between">
                 {/* Logo/Home */}
                 <Link href="/" className="text-xl font-bold gradient-text">
-                    Translayte
+                    Phrasey
                 </Link>
                 {user && (
                     <div className="text-sm text-gray-300 flex items-center gap-4">

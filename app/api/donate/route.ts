@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
           price_data: {
             currency: "usd",
             product_data: {
-              name: "Donation to Translayte",
+              name: "Donation to Phrasey",
               description: "Thank you for supporting our tool!",
             },
             unit_amount: Math.round(donationAmount * 100), // Convert to cents

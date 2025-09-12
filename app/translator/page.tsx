@@ -67,7 +67,7 @@ function SelectProjectModal({
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation'; // <-- Add this import
 import '@fortawesome/fontawesome-free/css/all.min.css';
-import '../translayte.css';
+import '../Phrasey.css';
 import { translateBatch } from '../utils/translator';
 import { auth, db } from '../lib/firebaseClient';
 import { highlightJson, prettyJson } from '../utils/prettyJson';

@@ -34,9 +34,7 @@ const ForgotPasswordPage: React.FC = () => {
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br from-[#A383F7] to-[#8257E6] shadow-lg">
                             <div className="w-5 h-5 bg-black rounded-[6px]" />
                         </div>
-                        <span className="text-lg font-bold text-white tracking-wide">
-                            Translayte
-                        </span>
+                        <span className="text-lg font-bold text-white tracking-wide">Phrasey</span>
                     </div>
                     {/* Title */}
                     <h1 className="text-4xl font-bold text-white mb-2">Reset your password</h1>

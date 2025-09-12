@@ -235,7 +235,7 @@ const AppHeader = ({ photoURL }: { photoURL: string | null }) => (
     <header className="flex items-center justify-between px-4 sm:px-6 lg:px-8 py-3 bg-[#181428]/50 backdrop-blur-sm border-b border-[#282443] sticky top-0 z-20">
         <div className="flex items-center gap-4">
             <Link href="/dashboard" className="text-lg font-bold text-[#A383F7]">
-                Translayte
+                Phrasey
             </Link>
             <nav className="hidden md:flex items-center gap-4 ml-6">
                 <NavLink href="/dashboard">Dashboard</NavLink>

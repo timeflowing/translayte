@@ -48,9 +48,7 @@ const LoginPage: React.FC = () => {
                         <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-xl flex items-center justify-center bg-gradient-to-br from-[#A383F7] to-[#8257E6] shadow-lg">
                             <div className="w-4 h-4 lg:w-5 lg:h-5 bg-black rounded-[6px]" />
                         </div>
-                        <span className="text-lg font-bold text-white tracking-wide">
-                            Translayte
-                        </span>
+                        <span className="text-lg font-bold text-white tracking-wide">Phrasey</span>
                     </div>
                     {/* Title */}
                     <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">

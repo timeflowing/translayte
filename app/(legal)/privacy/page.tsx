@@ -12,9 +12,9 @@ export default function Page() {
         >
             <p>
                 This Privacy Policy explains how <strong>Vojtěch Tomášek</strong> (&quot;we&quot;,
-                &quot;us&quot;) processes personal data when you use Translayte at{' '}
-                <strong>https://translayte.it</strong>. We act as the{' '}
-                <strong>data controller</strong> for personal data of users in the EU/EEA.
+                &quot;us&quot;) processes personal data when you use Phrasey at{' '}
+                <strong>https://Phrasey.it</strong>. We act as the <strong>data controller</strong>{' '}
+                for personal data of users in the EU/EEA.
             </p>
 
             <h2>1. Data We Process</h2>
@@ -96,7 +96,7 @@ export default function Page() {
                 </li>
                 <li>
                     To exercise rights, email{' '}
-                    <a href="mailto:support@translayte.it">support@translayte.it</a>.
+                    <a href="mailto:support@Phrasey.it">support@Phrasey.it</a>.
                 </li>
                 <li>You may lodge a complaint with your supervisory authority (in CZ: ÚOOÚ).</li>
             </ul>
@@ -117,7 +117,7 @@ export default function Page() {
             <p>
                 Data Controller: <strong>Vojtěch Tomášek</strong>,{' '}
                 <strong>17.listopadu 7, Zábřeh</strong>. Email:{' '}
-                <a href="mailto:support@translayte.it">support@translayte.it</a>.
+                <a href="mailto:support@Phrasey.it">support@Phrasey.it</a>.
             </p>
         </LegalShell>
     );

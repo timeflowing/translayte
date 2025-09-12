@@ -28,7 +28,7 @@ const NavigationBar = ({
     return (
         <header className="fixed w-full z-50 bg-primary/80 backdrop-blur-md border-b border-gray-800">
             <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-                <div className="text-xl font-bold gradient-text">Translayte</div>
+                <div className="text-xl font-bold gradient-text">Phrasey</div>
                 <nav className="hidden md:flex space-x-8">
                     {!user
                         ? NAV_LINKS.map(({ label, href }) => (

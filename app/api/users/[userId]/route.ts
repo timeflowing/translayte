@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 
 
 
-// filepath: /Users/vojtechtomasek/Desktop/translayte/app/api/shares/[token]/route.ts
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ token: string }> }

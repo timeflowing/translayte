@@ -5,7 +5,7 @@ import './translayte.css'; // holds gradient-text, btn-primary, feature-card, et
 import Link from 'next/link';
 
 /*****************************************************************************************
- *  FULL Translaytelanding page – React + Tailwind + Vanta.NET                        *
+ *  FULL Phraseylanding page – React + Tailwind + Vanta.NET                        *
  *  ------------------------------------------------------------------------------------ *
  *  • Pixel-for-pixel port of your entire HTML.                                           *
  *  • Uses Vanta.NET with colour-tween & denser mesh.                                     *
@@ -24,7 +24,7 @@ const NAV_LINKS = [
 const translations = {
     es: {
         'WelcomeScreen.greeting': 'Holla allí,',
-        'WelcomeScreen.title': 'Bienvenido a Translayte',
+        'WelcomeScreen.title': 'Bienvenido a Phrasey',
         'Navigation.home': 'Panel principal',
         'Navigation.about': 'Sobre nuestro equipo',
         'Navigation.contact': 'Soporte de contacto',
@@ -36,7 +36,7 @@ const translations = {
     },
     fr: {
         'WelcomeScreen.greeting': 'Salut, ça va ?',
-        'WelcomeScreen.title': 'Bienvenue sur Translayte',
+        'WelcomeScreen.title': 'Bienvenue sur Phrasey',
         'Navigation.home': 'Tableau de bord',
         'Navigation.about': "À propos de l'équipe",
         'Navigation.contact': 'Contacter le support',
@@ -48,7 +48,7 @@ const translations = {
     },
     de: {
         'WelcomeScreen.greeting': 'Hallo, wie geht’s?',
-        'WelcomeScreen.title': 'Willkommen bei Translayte',
+        'WelcomeScreen.title': 'Willkommen bei Phrasey',
         'Navigation.home': 'Startseite',
         'Navigation.about': 'Über unser Team',
         'Navigation.contact': 'Support kontaktieren',
@@ -60,7 +60,7 @@ const translations = {
     },
     it: {
         'WelcomeScreen.greeting': 'Ciao, come va?',
-        'WelcomeScreen.title': 'Benvenuto su Translayte',
+        'WelcomeScreen.title': 'Benvenuto su Phrasey',
         'Navigation.home': 'Dashboard',
         'Navigation.about': 'Il nostro team',
         'Navigation.contact': 'Contatta il supporto',
@@ -72,7 +72,7 @@ const translations = {
     },
     pt: {
         'WelcomeScreen.greeting': 'Olá, tudo bem?',
-        'WelcomeScreen.title': 'Bem-vindo ao Translayte',
+        'WelcomeScreen.title': 'Bem-vindo ao Phrasey',
         'Navigation.home': 'Painel principal',
         'Navigation.about': 'Sobre nossa equipe',
         'Navigation.contact': 'Contato de suporte',
@@ -268,7 +268,7 @@ const LandingPage = () => {
             {/* ------------------------------ Header -------------------------- */}
             <header className="fixed w-full z-50 bg-primary/80 backdrop-blur-md border-b border-gray-800">
                 <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-                    <div className="text-xl font-bold gradient-text">Translayte</div>
+                    <div className="text-xl font-bold gradient-text">Phrasey</div>
                     <nav className="hidden md:flex space-x-8">
                         {NAV_LINKS.map(({ label, href }) => (
                             <a
@@ -385,7 +385,7 @@ const LandingPage = () => {
                                 badgeColor="purple"
                                 content={{
                                     'WelcomeScreen.greeting': 'Hello there,',
-                                    'WelcomeScreen.title': 'Welcome to Translayte',
+                                    'WelcomeScreen.title': 'Welcome to Phrasey',
                                     'Navigation.home': 'Home Dashboard',
                                     'Navigation.about': 'About Our Team',
                                     'Navigation.contact': 'Contact Support',
@@ -448,7 +448,7 @@ const LandingPage = () => {
             </Section>
 
             {/* ------------------------------ Benefits ------------------------ */}
-            <Section id="benefits" title="Why Developers Choose Translayte">
+            <Section id="benefits" title="Why Developers Choose Phrasey">
                 <p className="text-center text-gray-300 mb-16 max-w-2xl mx-auto">
                     Designed by developers, for developers — we solve the localization headaches you
                     actually have.
@@ -597,9 +597,9 @@ const LandingPage = () => {
             <footer className="py-12 border-t border-gray-800">
                 <div className="container mx-auto px-4 flex flex-col md:flex-row justify-between items-center">
                     <div className="mb-6 md:mb-0">
-                        <div className="text-xl font-bold gradient-text mb-2">Translayte</div>
+                        <div className="text-xl font-bold gradient-text mb-2">Phrasey</div>
                         <p className="text-gray-400 text-sm">
-                            © {new Date().getFullYear()} Translayte – All rights reserved
+                            © {new Date().getFullYear()} Phrasey – All rights reserved
                         </p>
                     </div>
                     {/* <div className="flex flex-wrap justify-center gap-6">
