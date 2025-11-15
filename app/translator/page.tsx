@@ -1587,10 +1587,10 @@ export default function TranslatorPage() {
                 />
             )}
 
-            {/* Feedback Button - Bottom Right */}
+            {/* Feedback Button - Bottom Left */}
             <button
                 onClick={() => setShowFeedbackModal(true)}
-                className="fixed bottom-6 right-6 z-40 group flex items-center gap-3 px-5 py-3 bg-gradient-to-r from-[#8B5CF6] to-[#7C3AED] text-white rounded-full shadow-2xl hover:shadow-[#8B5CF6]/50 transition-all duration-300 hover:scale-105"
+                className="fixed bottom-6 left-6 z-40 group flex items-center gap-3 px-5 py-3 bg-gradient-to-r from-[#8B5CF6] to-[#7C3AED] text-white rounded-full shadow-2xl hover:shadow-[#8B5CF6]/50 transition-all duration-300 hover:scale-105"
             >
                 <i className="fa-solid fa-comment-dots text-lg" />
                 <div className="flex flex-col items-start">
