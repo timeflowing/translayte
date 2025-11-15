@@ -103,6 +103,7 @@ import { usePresence } from '../hooks/usePresence';
 import { CollaboratorsCard } from '../components/CollaboratorsCards';
 import { TranslatorHeader } from '../components/Header';
 import { FREE_TIER_KEY_LIMIT } from '../global/constants';
+import FeedbackModal from '../components/FeedbackModal';
 
 type HistoryItem = {
     id: string;
@@ -135,6 +136,7 @@ export default function TranslatorPage() {
     const { collaborators } = usePresence(translationId || undefined);
     const [showSelectProjectModal, setShowSelectProjectModal] = useState(false);
     const [showNewProjectModal, setShowNewProjectModal] = useState(false);
+    const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
     // Sharing state
     const [isPubliclyShared, setIsPubliclyShared] = useState(false);
@@ -1584,6 +1586,26 @@ export default function TranslatorPage() {
                     }}
                 />
             )}
+
+            {/* Feedback Button - Bottom Right */}
+            <button
+                onClick={() => setShowFeedbackModal(true)}
+                className="fixed bottom-6 right-6 z-40 group flex items-center gap-3 px-5 py-3 bg-gradient-to-r from-[#8B5CF6] to-[#7C3AED] text-white rounded-full shadow-2xl hover:shadow-[#8B5CF6]/50 transition-all duration-300 hover:scale-105"
+            >
+                <i className="fa-solid fa-comment-dots text-lg" />
+                <div className="flex flex-col items-start">
+                    <span className="font-semibold text-sm">Share Feedback</span>
+                    <span className="text-xs opacity-90">Help us improve!</span>
+                </div>
+            </button>
+
+            {/* Feedback Modal */}
+            <FeedbackModal
+                open={showFeedbackModal}
+                onClose={() => setShowFeedbackModal(false)}
+                translationId={translationId || 'general'}
+                user={user}
+            />
         </>
     );
 }

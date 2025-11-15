@@ -48,9 +48,6 @@ export function TranslatorHeader({
                         </button>
                         {profileOpen && (
                             <div className="absolute right-0 mt-2 w-40 bg-[#1f1f1f] border border-gray-700 rounded shadow-lg">
-                                <Link href="/profile" className="block px-4 py-2 hover:bg-gray-800">
-                                    Profile
-                                </Link>
                                 <Link href="/billing" className="block px-4 py-2 hover:bg-gray-800">
                                     Billing & Plan
                                 </Link>

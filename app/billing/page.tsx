@@ -5,30 +5,7 @@ import SynapseAnimation from '../utils/SynapseAnimation';
 import Link from 'next/link';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../lib/firebaseClient';
-
-const NavigationBar = () => (
-    <nav className="w-full bg-[#232136] border-b border-[#8B5CF6]/20 py-3 px-6 flex items-center justify-between mb-8 rounded-b-xl shadow-lg">
-        <div className="flex items-center gap-4">
-            <Link href="/" className="text-white font-bold text-lg hover:text-[#A78BFA]">
-                Phrasey
-            </Link>
-            <Link href="/translator" className="text-gray-300 hover:text-[#A78BFA]">
-                Translate
-            </Link>
-            <Link href="/projects" className="text-gray-300 hover:text-[#A78BFA]">
-                Projects
-            </Link>
-            <Link href="/billing" className="text-[#A78BFA] font-semibold">
-                Billing
-            </Link>
-        </div>
-        <div>
-            <Link href="/profile" className="text-gray-300 hover:text-[#A78BFA]">
-                Profile
-            </Link>
-        </div>
-    </nav>
-);
+import { TranslatorHeader } from '../components/Header';
 
 const BillingPage = () => {
     const [user, loadingAuth] = useAuthState(auth);
@@ -106,11 +83,21 @@ const BillingPage = () => {
         }
     };
 
+    const isPro =
+        loading ||
+        billing?.subscription?.status === 'active' ||
+        billing?.subscription?.status === 'trialing';
+
     return (
         <div className="min-h-screen relative overflow-hidden flex flex-col">
             <SynapseAnimation className="absolute inset-0 w-full h-full -z-10 pointer-events-none" />
-            <NavigationBar />
-            <div className="flex-1 flex items-center justify-center relative">
+            <TranslatorHeader
+                user={user ? { email: user.email || undefined } : null}
+                isPro={isPro}
+                keysThisMonth={0}
+                FREE_TIER_KEY_LIMIT={0}
+            />
+            <div className="flex-1 flex items-center justify-center relative pt-20">
                 <div className="bg-[#191627]/90 border border-[#8B5CF6]/10 shadow-xl rounded-2xl p-10 max-w-2xl w-full mx-4 relative z-10">
                     <h1 className="text-3xl font-bold mb-2 text-white text-center tracking-tight">
                         Billing & Subscription
