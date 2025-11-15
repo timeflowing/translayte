@@ -1429,7 +1429,7 @@ export default function TranslatorPage() {
                                                 : 'text-gray-400 hover:bg-gray-800'
                                         }`}
                                     >
-                                        Standard
+                                        JSON
                                     </button>
                                     <button
                                         onClick={() => setOutputFormat('unity')}
