@@ -1,15 +1,17 @@
-// 'use client';
+'use client';
 
-// import React, { useEffect, useState, useRef } from 'react';
-// import Image from 'next/image';
-// import Link from 'next/link';
-// import { updateProfile } from 'firebase/auth';
-// import { doc, getDoc, setDoc } from 'firebase/firestore';
-// import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-// import { auth, db as firestore } from '../lib/firebaseClient';
-// import SynapseAnimation from '../utils/SynapseAnimation';
-// import { useAuthState } from 'react-firebase-hooks/auth';
-// import { Camera, CheckCircle, XCircle } from 'lucide-react';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+
+export default function ProfilePage() {
+    const router = useRouter();
+    
+    useEffect(() => {
+        router.push('/billing');
+    }, [router]);
+    
+    return null;
+}
 
 // // --- Interfaces ---
 // interface UserProfile {
