@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth } from '../lib/firebaseClient';
 import GoogleLoginButton from '../utils/signInWithGoogle';
 import SynapseAnimation from '../utils/SynapseAnimation';
+import { useAuthState } from 'react-firebase-hooks/auth';
 
 const RegisterPage = () => {
     const [email, setEmail] = useState('');
@@ -17,6 +18,13 @@ const RegisterPage = () => {
     const [error, setError] = useState('');
     const [creating, setCreating] = useState(false);
     const router = useRouter();
+    const [user, loading] = useAuthState(auth);
+
+    useEffect(() => {
+        if (!loading && user) {
+            router.push('/translator');
+        }
+    }, [user, loading, router]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -67,6 +75,18 @@ const RegisterPage = () => {
             setCreating(false);
         }
     };
+
+    // Show loading state while checking authentication
+    if (loading) {
+        return (
+            <div className="fixed inset-0 flex items-center justify-center bg-[#0f0f0f]">
+                <div className="text-center">
+                    <div className="w-12 h-12 border-4 border-[#8B5CF6] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-gray-400 text-sm">Loading...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col lg:flex-row min-h-screen">

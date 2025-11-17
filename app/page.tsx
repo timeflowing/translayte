@@ -90,6 +90,7 @@ import { LegalFooterLinks } from './components/LegalFooterLinks';
 
 const LandingPage = () => {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [isCheckingAuth, setIsCheckingAuth] = useState(true);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const rafRef = useRef<number | null>(null);
     const router = useRouter();
@@ -100,6 +101,8 @@ const LandingPage = () => {
         const unsub = onAuthStateChanged(auth, user => {
             if (user) {
                 router.push('/translator');
+            } else {
+                setIsCheckingAuth(false);
             }
         });
         return () => unsub();
@@ -256,6 +259,18 @@ const LandingPage = () => {
         (code: typeof selectedLang) => setSelectedLang(code),
         [],
     );
+
+    // Show minimal loading state while checking authentication
+    if (isCheckingAuth) {
+        return (
+            <div className="fixed inset-0 flex items-center justify-center bg-[#0f0f0f]">
+                <div className="text-center">
+                    <div className="w-12 h-12 border-4 border-[#8B5CF6] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-gray-400 text-sm">Loading...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <>

@@ -32,6 +32,19 @@ const LoginPage: React.FC = () => {
             router.push('/translator');
         }
     }, [user, loading, router]);
+
+    // Show loading state while checking authentication
+    if (loading) {
+        return (
+            <div className="fixed inset-0 flex items-center justify-center bg-[#0f0f0f]">
+                <div className="text-center">
+                    <div className="w-12 h-12 border-4 border-[#8B5CF6] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-gray-400 text-sm">Loading...</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="flex flex-col lg:flex-row min-h-screen">
             {/* Left Side - Branding */}
