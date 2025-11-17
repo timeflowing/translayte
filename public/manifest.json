@@ -1,0 +1,29 @@
+{
+  "name": "Phrasey - JSON Translation Tool",
+  "short_name": "Phrasey",
+  "description": "Translate JSON files instantly with AI-powered localization",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f0f0f",
+  "theme_color": "#8B5CF6",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/fav.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "developer tools", "utilities"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Translator",
+      "short_name": "Translate",
+      "description": "Open the translation tool",
+      "url": "/translator",
+      "icons": []
+    }
+  ]
+}

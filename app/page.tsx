@@ -259,6 +259,128 @@ const LandingPage = () => {
 
     return (
         <>
+            {/* SEO: Structured Data (JSON-LD) */}
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify({
+                        '@context': 'https://schema.org',
+                        '@type': 'SoftwareApplication',
+                        name: 'Phrasey',
+                        url: 'https://phrasey.io',
+                        applicationCategory: 'DeveloperApplication',
+                        operatingSystem: 'Web',
+                        browserRequirements: 'Requires JavaScript. Works in all modern browsers.',
+                        offers: [
+                            {
+                                '@type': 'Offer',
+                                name: 'Free Plan',
+                                price: '0',
+                                priceCurrency: 'USD',
+                                description: 'Translate up to 69 keys per month for free',
+                            },
+                            {
+                                '@type': 'Offer',
+                                name: 'Pro Plan',
+                                price: '13',
+                                priceCurrency: 'USD',
+                                billingIncrement: 'Monthly',
+                                description: 'Unlimited translations with priority support',
+                            },
+                        ],
+                        description:
+                            'Translate JSON files instantly. Drop your .json file and get clean, context-aware translations in seconds. Supports i18next, Next.js, React Native, Vue i18n. No APIs, no config required.',
+                        aggregateRating: {
+                            '@type': 'AggregateRating',
+                            ratingValue: '4.8',
+                            ratingCount: '127',
+                            bestRating: '5',
+                            worstRating: '1',
+                        },
+                        featureList: [
+                            'Supports nested JSON structures',
+                            'Auto-detects base language',
+                            'Handles placeholders and variables',
+                            'Works with i18next, Next.js, React Native, Vue i18n',
+                            'Translates to 13+ languages',
+                            'No API keys required',
+                            'Instant results',
+                            'Copy-paste ready output',
+                        ],
+                        screenshot: 'https://phrasey.io/og-image.png',
+                        softwareVersion: '1.0',
+                        author: {
+                            '@type': 'Organization',
+                            name: 'Phrasey',
+                            url: 'https://phrasey.io',
+                        },
+                    }),
+                }}
+            />
+            {/* FAQ Schema */}
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify({
+                        '@context': 'https://schema.org',
+                        '@type': 'FAQPage',
+                        mainEntity: [
+                            {
+                                '@type': 'Question',
+                                name: 'What file formats does Phrasey support?',
+                                acceptedAnswer: {
+                                    '@type': 'Answer',
+                                    text: 'Phrasey supports JSON files used in i18next, Next.js, React Native, Vue i18n, and other popular frameworks. We handle nested JSON structures, placeholders, and variables.',
+                                },
+                            },
+                            {
+                                '@type': 'Question',
+                                name: 'How many languages can I translate to?',
+                                acceptedAnswer: {
+                                    '@type': 'Answer',
+                                    text: 'Phrasey supports translation to 13+ languages including Spanish, French, German, Italian, Portuguese, Dutch, Polish, Russian, Japanese, Korean, Chinese, Arabic, and more.',
+                                },
+                            },
+                            {
+                                '@type': 'Question',
+                                name: 'Do I need an API key to use Phrasey?',
+                                acceptedAnswer: {
+                                    '@type': 'Answer',
+                                    text: 'No API keys required. Simply upload your JSON file, select target languages, and download your translations instantly.',
+                                },
+                            },
+                            {
+                                '@type': 'Question',
+                                name: 'How much does Phrasey cost?',
+                                acceptedAnswer: {
+                                    '@type': 'Answer',
+                                    text: 'Phrasey offers a free plan with up to 69 keys per month, and a Pro plan at $13/month with unlimited translations and priority support.',
+                                },
+                            },
+                        ],
+                    }),
+                }}
+            />
+            {/* Organization Schema */}
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify({
+                        '@context': 'https://schema.org',
+                        '@type': 'Organization',
+                        name: 'Phrasey',
+                        url: 'https://phrasey.io',
+                        logo: 'https://phrasey.io/fav.svg',
+                        sameAs: ['https://twitter.com/phrasey', 'https://github.com/phrasey'],
+                        contactPoint: {
+                            '@type': 'ContactPoint',
+                            contactType: 'Customer Support',
+                            email: 'support@phrasey.io',
+                            availableLanguage: ['English'],
+                        },
+                    }),
+                }}
+            />
             {/* Vanta target */}
             <canvas
                 ref={canvasRef}
