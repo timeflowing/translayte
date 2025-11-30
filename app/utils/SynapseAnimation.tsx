@@ -1,3 +1,4 @@
+'use client';
 import React, { useEffect, useRef } from 'react';
 
 const SynapseAnimation: React.FC<{ className?: string }> = ({ className = '' }) => {
@@ -23,10 +24,18 @@ const SynapseAnimation: React.FC<{ className?: string }> = ({ className = '' }) 
         window.addEventListener('resize', resize);
 
         /* ------------------------------ nodes --------------------------- */
+        type Node = {
+            x: number;
+            y: number;
+            vx: number;
+            vy: number;
+            alpha: number;
+            created?: number;
+        };
         const isLargeScreen = window.innerWidth >= 768;
         const NODE_COUNT = isLargeScreen ? 520 : 240; // << DOUBLE NODES
         const LINK_LIMIT = isLargeScreen ? 210 : 170; // << SLIGHTLY INCREASED LINKS
-        const nodes = Array.from({ length: NODE_COUNT }, () => ({
+        const nodes: Node[] = Array.from({ length: NODE_COUNT }, () => ({
             x: Math.random() * canvas.width,
             y: Math.random() * canvas.height,
             vx: (Math.random() - 0.5) * 0.4,
@@ -52,6 +61,34 @@ const SynapseAnimation: React.FC<{ className?: string }> = ({ className = '' }) 
             mouse.y = e.clientY;
         };
         window.addEventListener('pointermove', onMove);
+
+        /* ------------------------------ click -> spawn ----------------- */
+        const onClick = (e: PointerEvent) => {
+            if (!canvas) return;
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            const cssX = e.clientX - rect.left;
+            const cssY = e.clientY - rect.top;
+            const physX = cssX * dpr;
+            const physY = cssY * dpr;
+
+            const newNode: Node = {
+                x: physX,
+                y: physY,
+                vx: (Math.random() - 0.5) * 1.2,
+                vy: (Math.random() - 0.5) * 1.2,
+                alpha: 0,
+                created: performance.now(),
+            };
+
+            nodes.push(newNode);
+            // Keep node count reasonable (allow some growth)
+            const MAX_EXTRA = 120;
+            if (nodes.length > NODE_COUNT + MAX_EXTRA) {
+                nodes.splice(0, nodes.length - (NODE_COUNT + MAX_EXTRA));
+            }
+        };
+        window.addEventListener('pointerdown', onClick);
 
         /* ------------------------------ loop ---------------------------- */
         const loop = () => {
@@ -96,6 +133,25 @@ const SynapseAnimation: React.FC<{ className?: string }> = ({ className = '' }) 
                 ctx.beginPath();
                 ctx.arc(n.x, n.y, 2, 0, Math.PI * 2);
                 ctx.fill();
+
+                // If recently created, draw a brief highlight pulse
+                if (n.created) {
+                    const age = performance.now() - (n.created as number);
+                    if (age < 700) {
+                        const progress = 1 - age / 700;
+                        const r = 6 + progress * 6;
+                        ctx.save();
+                        const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r);
+                        g.addColorStop(0, `rgba(255,200,80,${0.7 * progress})`);
+                        g.addColorStop(0.6, `rgba(255,120,40,${0.3 * progress})`);
+                        g.addColorStop(1, 'rgba(255,120,40,0)');
+                        ctx.fillStyle = g;
+                        ctx.beginPath();
+                        ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.restore();
+                    }
+                }
             });
 
             ctx.lineWidth = 1;
@@ -127,13 +183,14 @@ const SynapseAnimation: React.FC<{ className?: string }> = ({ className = '' }) 
             }
             window.removeEventListener('resize', resize);
             window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerdown', onClick);
         };
     }, []);
 
     return (
         <canvas
             ref={canvasRef}
-            className={`absolute inset-0 w-full h-full object-cover -z-10 pointer-events-none ${className}`}
+            className={`fixed inset-0 w-full h-full object-cover -z-20 pointer-events-none ${className}`}
             aria-hidden
         />
     );
