@@ -190,7 +190,8 @@ const SynapseAnimation: React.FC<{ className?: string }> = ({ className = '' }) 
     return (
         <canvas
             ref={canvasRef}
-            className={`fixed inset-0 w-full h-full object-cover -z-20 pointer-events-none ${className}`}
+            className={`fixed inset-0 w-full h-full object-cover pointer-events-none ${className}`}
+            style={{ zIndex: -1 }}
             aria-hidden
         />
     );
