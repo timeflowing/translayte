@@ -4,16 +4,26 @@ import React from 'react';
 const ModeSwitcher = ({
     mode,
     setMode,
-    onCreateProject,
 }: {
-    mode: 'file' | 'keys';
-    setMode: React.Dispatch<React.SetStateAction<'file' | 'keys'>>;
-    onCreateProject?: () => void;
+    mode: 'file' | 'keys' | 'text';
+    setMode: React.Dispatch<React.SetStateAction<'file' | 'keys' | 'text'>>;
 }) => (
     <div className="flex justify-center mb-10">
         <div className="inline-flex w-full max-w-xl gap-2 rounded-xl p-2 bg-[#0F0F0F] shadow-lg">
-            {(['file', 'keys'] as const).map(m => {
+            {(['file', 'keys', 'text'] as const).map(m => {
                 const active = mode === m;
+                let icon = '';
+                let label = '';
+                if (m === 'file') {
+                    icon = 'fa-solid fa-file-arrow-up';
+                    label = 'File Upload';
+                } else if (m === 'keys') {
+                    icon = 'fa-solid fa-key';
+                    label = 'Key Input';
+                } else if (m === 'text') {
+                    icon = 'fa-solid fa-font';
+                    label = 'Text Input';
+                }
                 return (
                     <button
                         key={m}
@@ -24,7 +34,7 @@ const ModeSwitcher = ({
                     >
                         <i
                             className={
-                                (m === 'file' ? 'fa-solid fa-file-arrow-up' : 'fa-solid fa-key') +
+                                icon +
                                 ' text-lg mb-1 ' +
                                 (active ? 'text-[#8B5CF6]' : 'text-gray-400')
                             }
@@ -36,19 +46,11 @@ const ModeSwitcher = ({
                                 fontWeight: active ? 800 : 600,
                             }}
                         >
-                            {m === 'file' ? 'File Upload' : 'Key Input'}
+                            {label}
                         </span>
                     </button>
                 );
             })}
-            <button
-                onClick={onCreateProject}
-                className="flex flex-col items-center justify-center px-4 py-3 rounded-lg border border-gray-700/50 bg-transparent text-gray-400 font-bold shadow-none hover:bg-gray-800/30 hover:text-white transition-all ml-2"
-                title="Create New Project"
-            >
-                <i className="fa-solid fa-plus text-lg mb-1 text-gray-500 group-hover:text-white transition-colors" />
-                <span className="text-sm font-bold">New Project</span>
-            </button>
         </div>
     </div>
 );

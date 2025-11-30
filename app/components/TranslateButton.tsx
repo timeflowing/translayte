@@ -1,28 +1,50 @@
-'use client';
 import React from 'react';
 
-export const TranslateButton = ({
-    onClick,
-    loading,
-}: {
+interface TranslateButtonProps {
     onClick: () => void;
     loading: boolean;
+    isRetranslate?: boolean;
+    disabled: boolean;
+}
+
+const TranslateButton: React.FC<TranslateButtonProps> = ({
+    onClick,
+    loading,
+    isRetranslate,
+    disabled,
 }) => (
     <button
         onClick={onClick}
-        disabled={loading}
-        className="w-full inline-flex items-center justify-center px-8 py-4 rounded-lg font-bold text-lg text-white bg-gradient-to-r from-[#8B5CF6] to-[#5A3E8A] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+        disabled={disabled || loading}
+        className={`w-full px-4 py-3 rounded-xl font-bold text-white shadow-lg transition-all text-lg flex items-center justify-center gap-3 border-2 border-transparent
+            ${
+                disabled || loading
+                    ? 'bg-gray-400 cursor-not-allowed opacity-60 border-gray-300'
+                    : 'bg-gradient-to-r from-[#8B5CF6] to-[#7C3AED] hover:from-[#7C3AED] hover:to-[#8B5CF6] border-[#8B5CF6]'
+            }
+        `}
+        style={{ letterSpacing: '0.03em' }}
     >
         {loading ? (
-            <>
-                <i className="fa-solid fa-spinner fa-spin mr-2" />
-                Translating...
-            </>
+            <span className="flex items-center gap-2">
+                <i className="fa-solid fa-spinner fa-spin text-xl" />
+                <span className="animate-pulse">
+                    {isRetranslate ? 'Retranslating…' : 'Translating…'}
+                </span>
+            </span>
         ) : (
             <>
-                <i className="fa-solid fa-bolt mr-2" />
-                Translate
+                <i
+                    className={`fa-solid fa-language text-xl drop-shadow ${
+                        isRetranslate ? 'text-[#8B5CF6]' : 'text-white'
+                    }`}
+                />
+                <span className="tracking-wide text-shadow-lg">
+                    {isRetranslate ? 'Retranslate' : 'Translate'}
+                </span>
             </>
         )}
     </button>
 );
+
+export default TranslateButton;

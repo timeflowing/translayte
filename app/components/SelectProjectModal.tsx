@@ -1,9 +1,13 @@
 import React from 'react';
 
-interface HistoryItem {
+export type HistoryItem = {
     id: string;
+    userId?: string;
     fileName?: string;
-}
+    targetLanguages?: string[];
+    translationResult?: Record<string, Record<string, string>>;
+    createdAt?: { seconds: number; nanoseconds: number };
+};
 
 interface SelectProjectModalProps {
     history: HistoryItem[];
@@ -11,11 +15,7 @@ interface SelectProjectModalProps {
     onClose: () => void;
 }
 
-export default function SelectProjectModal({
-    history,
-    onSelect,
-    onClose,
-}: SelectProjectModalProps) {
+const SelectProjectModal: React.FC<SelectProjectModalProps> = ({ history, onSelect, onClose }) => {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
             <div className="bg-[#18132a] border-2 border-[#8B5CF6] rounded-2xl p-7 w-full max-w-md shadow-2xl relative animate-fadeIn">
@@ -70,4 +70,6 @@ export default function SelectProjectModal({
             </div>
         </div>
     );
-}
+};
+
+export default SelectProjectModal;

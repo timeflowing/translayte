@@ -104,6 +104,8 @@ import { CollaboratorsCard } from '../components/CollaboratorsCards';
 import { TranslatorHeader } from '../components/Header';
 import { FREE_TIER_KEY_LIMIT } from '../global/constants';
 import FeedbackModal from '../components/FeedbackModal';
+import TranslateButton from '../components/TranslateButton';
+import { deleteTranslation, mergeAllTranslations, safeParseJsonInput } from './utils';
 
 type HistoryItem = {
     id: string;
@@ -145,7 +147,8 @@ export default function TranslatorPage() {
     const [rows, setRows] = useState<{ key: string; value: string; context: string }[]>([
         { key: '', value: '', context: '' },
     ]);
-    const [mode, setMode] = useState<'file' | 'keys'>('file');
+    const [mode, setMode] = useState<'file' | 'keys' | 'text'>('file');
+    const [copyWithBraces, setCopyWithBraces] = useState(true);
 
     const [minify] = useState(false);
     // const [lastPayload, setLastPayload] = useState<Record<string, string> | null>(null);
@@ -367,7 +370,18 @@ export default function TranslatorPage() {
                     : translationResult[selectedLangTab] ?? {};
         }
 
-        navigator.clipboard.writeText(JSON.stringify(data, null, minify ? 0 : 2));
+        let textToCopy = JSON.stringify(data, null, minify ? 0 : 2);
+        if (!copyWithBraces) {
+            // Remove outer braces: copy only the inner content
+            if (
+                typeof textToCopy === 'string' &&
+                textToCopy.startsWith('{') &&
+                textToCopy.endsWith('}')
+            ) {
+                textToCopy = textToCopy.slice(1, -1).trim();
+            }
+        }
+        navigator.clipboard.writeText(textToCopy);
         toast.success('Copied to clipboard!');
     };
 
@@ -467,7 +481,7 @@ export default function TranslatorPage() {
         }
 
         const payload =
-            mode === 'file'
+            mode === 'file' || mode === 'text'
                 ? (() => {
                       try {
                           return parseInput(jsonInput || '{}');
@@ -567,18 +581,6 @@ export default function TranslatorPage() {
         }
     };
 
-    function mergeAllTranslations(
-        translations: Record<string, Record<string, string>>,
-    ): Record<string, string> {
-        const merged: Record<string, string> = {};
-        for (const [lang, entries] of Object.entries(translations)) {
-            for (const [key, value] of Object.entries(entries)) {
-                const newKey = `${lang}:${key}`;
-                merged[newKey] = value;
-            }
-        }
-        return merged;
-    }
     const tryTranslate = () => {
         if (authLoading) return;
         if (!user) {
@@ -593,6 +595,7 @@ export default function TranslatorPage() {
         // Prevent translation if input area is empty
         if (
             (mode === 'file' && (!jsonInput || jsonInput.trim() === '')) ||
+            (mode === 'text' && (!jsonInput || jsonInput.trim() === '')) ||
             (mode === 'keys' && rows.filter(r => r.key && r.value).length === 0)
         ) {
             toast.error('Please enter text or key-value pairs to translate.');
@@ -888,11 +891,207 @@ export default function TranslatorPage() {
                     {/* ------------ upload / keys column ------------ */}
                     <section className="w-full lg:w-9/12 mb-10 lg:mb-0">
                         {/* mode switch */}
-                        <ModeSwitcher
-                            mode={mode}
-                            setMode={setMode}
-                            onCreateProject={() => setShowNewProjectModal(true)}
-                        />
+                        <ModeSwitcher mode={mode} setMode={setMode} />
+
+                        {/* Show the same input area as file upload when mode is 'text', under switches */}
+                        {mode === 'text' && (
+                            <>
+                                <div
+                                    className="flex flex-col"
+                                    style={{ minHeight: 'calc(100vh - 30rem)' }}
+                                >
+                                    {/* --- Sub-Toolbar: View Controls & Actions --- */}
+                                    <div className="flex flex-wrap items-center justify-between gap-4 p-4">
+                                        {/* Left: View Mode Tabs (optional for text mode) */}
+                                    </div>
+                                    {/* Brace and Color buttons inside input area, left-aligned */}
+                                    <div className="flex items-center justify-between gap-2 px-4 pb-2">
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => setCopyWithBraces(v => !v)}
+                                                className={`px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1 border border-[#8B5CF6] transition-all ${
+                                                    copyWithBraces
+                                                        ? 'bg-[#18132a] text-[#8B5CF6] hover:bg-[#8B5CF6]/10'
+                                                        : 'bg-[#8B5CF6] text-white hover:bg-[#7C3AED]'
+                                                }`}
+                                                title={
+                                                    copyWithBraces
+                                                        ? 'Copy with outer braces { }'
+                                                        : 'Copy without outer braces'
+                                                }
+                                            >
+                                                <i
+                                                    className={`fa-solid fa-brackets-curly text-xs ${
+                                                        copyWithBraces
+                                                            ? ''
+                                                            : 'fa-ban text-red-400 ml-1'
+                                                    }`}
+                                                />
+                                                {copyWithBraces ? (
+                                                    <span className="ml-1">
+                                                        &#123; &#125; With &#123; &#125;
+                                                    </span>
+                                                ) : (
+                                                    <span className="ml-1">No &#123; &#125;</span>
+                                                )}
+                                            </button>
+                                            <button
+                                                onClick={() => setColorized(v => !v)}
+                                                className={`px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1 border border-[#8B5CF6] transition-all ${
+                                                    colorized
+                                                        ? 'bg-[#18132a] text-[#8B5CF6] hover:bg-[#8B5CF6]/10'
+                                                        : 'bg-gradient-to-r from-[#8B5CF6] to-[#7C3AED] text-white hover:opacity-90'
+                                                }`}
+                                                title={
+                                                    colorized
+                                                        ? 'Disable Coloring'
+                                                        : 'Enable Coloring'
+                                                }
+                                            >
+                                                <i className="fa-solid fa-palette text-xs" />
+                                            </button>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={copyCurrent}
+                                                className="px-3 py-1 rounded-lg bg-[#8B5CF6] text-white font-bold shadow-lg hover:bg-[#7C3AED] transition-colors flex items-center gap-1 text-xs"
+                                            >
+                                                <i className="fa-solid fa-copy text-xs" />
+                                                Copy
+                                            </button>
+                                            <button
+                                                onClick={downloadCurrent}
+                                                className="px-3 py-1 rounded-lg bg-[#8B5CF6] text-white font-bold shadow-lg hover:bg-[#7C3AED] transition-colors flex items-center gap-1 text-xs"
+                                            >
+                                                <i className="fa-solid fa-download text-xs" />
+                                                Download
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="flex-grow">
+                                        <RealtimeInputSection
+                                            inputText={jsonInput}
+                                            setInputText={setJsonInput}
+                                            onDuplicatesChange={setRealtimeDuplicates}
+                                            detectedLanguage={detectedLanguageName}
+                                            onSourceLanguageChange={handleSourceLanguageChange}
+                                            sourceLanguageCode={sourceLanguageCode}
+                                            availableLanguages={sourceLanguageOptions}
+                                        />
+                                    </div>
+                                    {/* Show duplicate warning */}
+                                    {realtimeDuplicates?.hasDuplicates && (
+                                        <div className="mt-4 flex-shrink-0">
+                                            <DuplicateWarning
+                                                analysis={realtimeDuplicates}
+                                                onUnify={unifiedTranslations => {
+                                                    const unifiedJson = JSON.stringify(
+                                                        unifiedTranslations,
+                                                        null,
+                                                        2,
+                                                    );
+                                                    setJsonInput(unifiedJson);
+                                                    setRealtimeDuplicates(null);
+                                                }}
+                                                onDismiss={() => setRealtimeDuplicates(null)}
+                                                originalTranslations={(() => {
+                                                    try {
+                                                        const parsed = JSON.parse(jsonInput);
+                                                        return parsed;
+                                                    } catch {
+                                                        return {};
+                                                    }
+                                                })()}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                                {/* --- Main Content Area --- */}
+                                {translationResult && (
+                                    <div className="px-4 pb-4 min-h-[400px]">
+                                        {selectedView === 'json' && selectedLangTab && (
+                                            <div className="bg-[#111111] p-4 rounded-lg border border-gray-700 overflow-auto">
+                                                <pre
+                                                    className="font-mono whitespace-pre text-sm leading-relaxed"
+                                                    dangerouslySetInnerHTML={{
+                                                        __html: colorized
+                                                            ? highlightJson(
+                                                                  prettyJson(
+                                                                      outputFormat === 'unity'
+                                                                          ? transformToUnityFormat(
+                                                                                selectedLangTab ===
+                                                                                    'ALL'
+                                                                                    ? translationResult
+                                                                                    : {
+                                                                                          [selectedLangTab]:
+                                                                                              translationResult?.[
+                                                                                                  selectedLangTab
+                                                                                              ] ??
+                                                                                              {},
+                                                                                      },
+                                                                            )
+                                                                          : selectedLangTab ===
+                                                                            'ALL'
+                                                                          ? Object.fromEntries(
+                                                                                Object.entries(
+                                                                                    translationResult ??
+                                                                                        {},
+                                                                                ).map(
+                                                                                    ([
+                                                                                        langCode,
+                                                                                        entries,
+                                                                                    ]) => [
+                                                                                        langCode,
+                                                                                        entries,
+                                                                                    ],
+                                                                                ),
+                                                                            )
+                                                                          : translationResult?.[
+                                                                                selectedLangTab
+                                                                            ] ?? {},
+                                                                  ),
+                                                              )
+                                                            : prettyJson(
+                                                                  outputFormat === 'unity'
+                                                                      ? transformToUnityFormat(
+                                                                            selectedLangTab ===
+                                                                                'ALL'
+                                                                                ? translationResult
+                                                                                : {
+                                                                                      [selectedLangTab]:
+                                                                                          translationResult?.[
+                                                                                              selectedLangTab
+                                                                                          ] ?? {},
+                                                                                  },
+                                                                        )
+                                                                      : selectedLangTab === 'ALL'
+                                                                      ? Object.fromEntries(
+                                                                            Object.entries(
+                                                                                translationResult ??
+                                                                                    {},
+                                                                            ).map(
+                                                                                ([
+                                                                                    langCode,
+                                                                                    entries,
+                                                                                ]) => [
+                                                                                    langCode,
+                                                                                    entries,
+                                                                                ],
+                                                                            ),
+                                                                        )
+                                                                      : translationResult?.[
+                                                                            selectedLangTab
+                                                                        ] ?? {},
+                                                              ),
+                                                    }}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </>
+                        )}
+                        {/* mode switch */}
 
                         <div className="relative mt-4">
                             {/* This div blurs and disables inputs for logged-out users */}
@@ -1059,42 +1258,73 @@ export default function TranslatorPage() {
                                                             </button>
                                                         ))}
                                                     </div>
+                                                </div>
 
-                                                    {/* Right: Action Buttons */}
+                                                {/* Brace and Color buttons inside input area, left-aligned */}
+                                                <div className="flex items-center justify-between gap-2 px-4 pb-2">
                                                     <div className="flex items-center gap-2">
                                                         <button
+                                                            onClick={() =>
+                                                                setCopyWithBraces(v => !v)
+                                                            }
+                                                            className={`px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1 border border-[#8B5CF6] transition-all ${
+                                                                copyWithBraces
+                                                                    ? 'bg-[#18132a] text-[#8B5CF6] hover:bg-[#8B5CF6]/10'
+                                                                    : 'bg-[#8B5CF6] text-white hover:bg-[#7C3AED]'
+                                                            }`}
+                                                            title={
+                                                                copyWithBraces
+                                                                    ? 'Copy with outer braces { }'
+                                                                    : 'Copy without outer braces'
+                                                            }
+                                                        >
+                                                            {copyWithBraces ? (
+                                                                <span className="ml-1">
+                                                                    With &#123; &#125;
+                                                                </span>
+                                                            ) : (
+                                                                <span className="ml-1">
+                                                                    No &#123; &#125;
+                                                                </span>
+                                                            )}
+                                                        </button>
+                                                        <button
                                                             onClick={() => setColorized(v => !v)}
-                                                            className="px-3 py-1.5 rounded-md bg-[#2a2a2a] text-gray-300 hover:bg-[#3a3a3a] text-sm font-medium"
+                                                            className={`px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1 border border-[#8B5CF6] transition-all ${
+                                                                colorized
+                                                                    ? 'bg-[#18132a] text-[#8B5CF6] hover:bg-[#8B5CF6]/10'
+                                                                    : 'bg-gradient-to-r from-[#8B5CF6] to-[#7C3AED] text-white hover:opacity-90'
+                                                            }`}
                                                             title={
                                                                 colorized
                                                                     ? 'Disable Coloring'
                                                                     : 'Enable Coloring'
                                                             }
                                                         >
-                                                            <i
-                                                                className={`fa-solid ${
-                                                                    colorized
-                                                                        ? 'fa-eye-slash'
-                                                                        : 'fa-eye'
-                                                                }`}
-                                                            />
+                                                            <i className="fa-solid fa-palette text-xs" />
                                                         </button>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
                                                         <button
                                                             onClick={copyCurrent}
-                                                            className="px-3 py-1.5 rounded-md bg-[#2a2a2a] text-gray-300 hover:bg-[#3a3a3a] text-sm font-medium"
+                                                            className="px-3 py-1 rounded-lg bg-[#8B5CF6] text-white font-bold shadow-lg hover:bg-[#7C3AED] transition-colors flex items-center gap-1 text-xs"
                                                         >
-                                                            <i className="fa-solid fa-copy mr-1" />{' '}
+                                                            <i className="fa-solid fa-copy text-xs" />
                                                             Copy
                                                         </button>
                                                         <button
                                                             onClick={downloadCurrent}
-                                                            className="px-3 py-1.5 rounded-md bg-[#2a2a2a] text-gray-300 hover:bg-[#3a3a3a] text-sm font-medium"
+                                                            className="px-3 py-1 rounded-lg bg-[#8B5CF6] text-white font-bold shadow-lg hover:bg-[#7C3AED] transition-colors flex items-center gap-1 text-xs"
                                                         >
-                                                            <i className="fa-solid fa-download mr-1" />{' '}
+                                                            <i className="fa-solid fa-download text-xs" />
                                                             Download
                                                         </button>
                                                     </div>
                                                 </div>
+
+                                                {/* --- Main Content Area --- */}
+                                                {/* Move Copy/Download above main content, right-aligned */}
+                                                {/* ...existing code... */}
 
                                                 {/* --- Main Content Area --- */}
                                                 <div className="px-4 pb-4 min-h-[400px]">
@@ -1429,7 +1659,7 @@ export default function TranslatorPage() {
                                                 : 'text-gray-400 hover:bg-gray-800'
                                         }`}
                                     >
-                                        JSON
+                                        i18next
                                     </button>
                                     <button
                                         onClick={() => setOutputFormat('unity')}
@@ -1608,63 +1838,4 @@ export default function TranslatorPage() {
             />
         </>
     );
-}
-
-const TranslateButton = ({
-    onClick,
-    loading,
-    isRetranslate,
-    disabled,
-}: {
-    onClick: () => void;
-    loading: boolean;
-    isRetranslate?: boolean;
-    disabled: boolean;
-}) => (
-    <button
-        onClick={onClick}
-        disabled={loading || disabled}
-        className={`btn-primary w-full group relative inline-flex items-center justify-center ${
-            disabled ? 'opacity-20 cursor-not-allowed' : ''
-        }`}
-    >
-        <span className="absolute inset-0 rounded-lg" />
-        <span className="relative z-10">
-            {loading ? (
-                <>
-                    <i className="fa-solid fa-spinner fa-spin mr-2" />{' '}
-                    {isRetranslate ? 'Retranslating…' : 'Translating…'}
-                </>
-            ) : isRetranslate ? (
-                'Retranslate Text'
-            ) : (
-                'Translate'
-            )}
-        </span>
-    </button>
-);
-async function deleteTranslation(id: string) {
-    try {
-        await deleteDoc(doc(db, 'translations', id));
-        toast.success('Translation deleted!');
-    } catch {
-        toast.error('Failed to delete translation.');
-    }
-}
-
-function safeParseJsonInput(input: string): object | null {
-    let text = input.trim();
-
-    // Remove trailing commas before wrapping
-    text = text.replace(/,(\s*})?$/gm, '$1');
-
-    // If not wrapped in { }, wrap it
-    if (text.length && !text.startsWith('{') && !text.endsWith('}')) {
-        text = `{${text}}`;
-    }
-    try {
-        return JSON.parse(text);
-    } catch {
-        return null;
-    }
 }
