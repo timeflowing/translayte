@@ -94,6 +94,7 @@ import RealtimeInputSection from '../components/RealtimeInputSection';
 import { LanguageGrid } from '../components/LanguageGrid';
 import { HistoryAside } from '../components/HistoryAside'; // Import the new component
 import { toast } from 'react-toastify';
+import Footer from '../components/Footer';
 import ModeSwitcher from '../components/ModeSwitcher';
 import NewProjectModal from '../components/NewProjectModal';
 import { DropZone } from '../components/DropZone';
@@ -604,19 +605,30 @@ export default function TranslatorPage() {
         handleTranslate();
     };
 
-    // Stripe Firebase Extension checkout
+    // Create a Stripe Checkout session and redirect
     const goPro = async () => {
         if (!user) return;
-        // Call the Stripe extension's checkout function
-        const response = await fetch('/api/stripe/extension-checkout', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ uid: user.uid, email: user.email }),
-        });
-        const { url } = await response.json();
-        if (url) {
-            window.location.href = url;
-        } else {
+        try {
+            const resp = await fetch('/api/stripe/checkout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: user.email }),
+            });
+
+            if (!resp.ok) {
+                toast.error('Failed to start checkout.');
+                return;
+            }
+
+            const data = await resp.json();
+            const url = data?.url;
+            if (url) {
+                window.location.href = url;
+            } else {
+                toast.error('Failed to start checkout.');
+            }
+        } catch (err) {
+            console.error('goPro error', err);
             toast.error('Failed to start checkout.');
         }
     };
@@ -886,7 +898,8 @@ export default function TranslatorPage() {
                 FREE_TIER_KEY_LIMIT={FREE_TIER_KEY_LIMIT}
             />
             {/* main */}
-            <main className="pt-24 pb-20 mx-auto px-4 md:px-6 max-w-[1600px]">
+            <main className="pt-24 pb-36 mx-auto px-4 md:px-6 max-w-[1600px]">
+                {/* increased bottom padding */}
                 <div className="flex flex-col lg:flex-row lg:space-x-6">
                     {/* ------------ upload / keys column ------------ */}
                     <section className="w-full lg:w-9/12 mb-10 lg:mb-0">
@@ -1820,7 +1833,7 @@ export default function TranslatorPage() {
             {/* Feedback Button - Bottom Left */}
             <button
                 onClick={() => setShowFeedbackModal(true)}
-                className="fixed bottom-6 left-6 z-40 group flex items-center gap-3 px-5 py-3 bg-gradient-to-r from-[#8B5CF6] to-[#7C3AED] text-white rounded-full shadow-2xl hover:shadow-[#8B5CF6]/50 transition-all duration-300 hover:scale-105"
+                className="fixed bottom-12 left-6 z-40 group flex items-center gap-3 px-5 py-3 bg-gradient-to-r from-[#8B5CF6] to-[#7C3AED] text-white rounded-full shadow-2xl hover:shadow-[#8B5CF6]/50 transition-all duration-300 hover:scale-105"
             >
                 <i className="fa-solid fa-comment-dots text-lg" />
                 <div className="flex flex-col items-start">
@@ -1836,6 +1849,9 @@ export default function TranslatorPage() {
                 translationId={translationId || 'general'}
                 user={user}
             />
+
+            {/* Footer */}
+            <Footer />
         </>
     );
 }
